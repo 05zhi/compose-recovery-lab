@@ -49,7 +49,14 @@ func randomID() string {
 // Docker stderr can contain connection strings and environment values. The CLI
 // stores only the operation and exit condition; checks emit bounded synthetic evidence.
 func docker(ctx context.Context, input io.Reader, output io.Writer, args ...string) error {
-	step, cancel := context.WithTimeout(ctx, 90*time.Second)
+	duration := 90 * time.Second
+	for _, arg := range args {
+		if arg == "pg_restore" || arg == "pg_dump" {
+			duration = 10 * time.Minute
+			break
+		}
+	}
+	step, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
 	cmd := exec.CommandContext(step, "docker", args...)
 	cmd.Stdin = input
@@ -145,6 +152,9 @@ func (s *Session) prepare(ctx context.Context) error {
 	db["volumes"] = []string{"database:/var/lib/postgresql/data"}
 	db["healthcheck"] = map[string]any{"test": []string{"CMD", "pg_isready", "-U", "bootstrap", "-d", "postgres"}, "interval": "1s", "timeout": "3s", "retries": 60}
 	app := common(s.Images.App)
+	app["init"] = true
+	app["mem_limit"] = "768m"
+	app["pids_limit"] = 256
 	app["environment"] = map[string]string{"DATABASE_URL": "postgresql://demo:" + s.password + "@db/documents", "DEMO_PASSWORD": s.password, "CHECK_DATABASE_URL": "postgresql://crl_check:" + s.password + "@db/documents"}
 	app["volumes"] = []string{"uploads:/uploads"}
 	app["read_only"] = true
@@ -162,7 +172,7 @@ func (s *Session) compose(ctx context.Context, args ...string) error {
 	return errors.Join(err, s.discover(reconciliation))
 }
 func (s *Session) container(ctx context.Context, service string) (string, error) {
-	ids, err := capture(ctx, "ps", "-aq", "--filter", "label="+label+"="+s.ID, "--filter", "label=com.docker.compose.service="+service)
+	ids, err := capture(ctx, "ps", "-aq", "--no-trunc", "--filter", "label="+label+"="+s.ID, "--filter", "label=com.docker.compose.service="+service)
 	if err != nil {
 		return "", err
 	}
