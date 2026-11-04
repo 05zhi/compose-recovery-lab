@@ -30,19 +30,20 @@ type Step struct {
 	Status  string    `json:"status"`
 }
 type Report struct {
-	RunID        string     `json:"run_id"`
-	Operation    string     `json:"operation"`
-	Started      time.Time  `json:"started_at"`
-	Finished     time.Time  `json:"finished_at"`
-	Verification string     `json:"verification_result"`
-	Cleanup      string     `json:"cleanup_result"`
-	BackupID     string     `json:"backup_id,omitempty"`
-	Images       Images     `json:"images"`
-	Steps        []Step     `json:"steps"`
-	Checks       []Check    `json:"checks"`
-	Remaining    []Resource `json:"remaining_resources"`
-	Error        string     `json:"error,omitempty"`
-	Limitations  []string   `json:"limitations"`
+	RunID        string           `json:"run_id"`
+	Operation    string           `json:"operation"`
+	Started      time.Time        `json:"started_at"`
+	Finished     time.Time        `json:"finished_at"`
+	Verification string           `json:"verification_result"`
+	Cleanup      string           `json:"cleanup_result"`
+	BackupID     string           `json:"backup_id,omitempty"`
+	Backup       *source.Manifest `json:"backup,omitempty"`
+	Images       Images           `json:"images"`
+	Steps        []Step           `json:"steps"`
+	Checks       []Check          `json:"checks"`
+	Remaining    []Resource       `json:"remaining_resources"`
+	Error        string           `json:"error,omitempty"`
+	Limitations  []string         `json:"limitations"`
 }
 
 func (r *Report) step(name string, fn func() error) error {
@@ -61,7 +62,7 @@ func (r *Report) write(dir string) error {
 	if err := writeJSON(filepath.Join(dir, "report.json"), r); err != nil {
 		return err
 	}
-	t := template.Must(template.New("report").Parse(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Compose Recovery Lab</title><style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ccc;text-align:left}code{overflow-wrap:anywhere}</style><h1>Compose Recovery Lab</h1><p>Run <code>{{.RunID}}</code></p><p>Verification: <b>{{.Verification}}</b> · Cleanup: <b>{{.Cleanup}}</b></p><p>{{.Error}}</p><h2>Checks</h2><table>{{range .Checks}}<tr><th>{{.ID}}</th><td>{{.Status}}</td><td>{{.Evidence}}</td></tr>{{end}}</table><h2>Phases</h2><table>{{range .Steps}}<tr><th>{{.Name}}</th><td>{{.Status}}</td><td>{{printf "%.3f" .Seconds}} s</td></tr>{{end}}</table><h2>Coverage and limitations</h2><ul>{{range .Limitations}}<li>{{.}}</li>{{end}}</ul></html>`))
+	t := template.Must(template.New("report").Parse(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Compose Recovery Lab</title><style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ccc;text-align:left}code{overflow-wrap:anywhere}</style><h1>Compose Recovery Lab</h1><p>Run <code>{{.RunID}}</code></p><p>Verification: <b>{{.Verification}}</b> · Cleanup: <b>{{.Cleanup}}</b></p><p>{{.Error}}</p><p>Backup: <code>{{.BackupID}}</code></p><p>PostgreSQL image: <code>{{.Images.Postgres}}</code></p><p>Application image: <code>{{.Images.App}}</code></p><p>{{.Started}} — {{.Finished}}</p>{{with .Backup}}<p>Consistency: {{.Consistency}}</p><p>Backup interval: {{.StartedAt}} — {{.FinishedAt}}; attachments: {{.AttachmentCount}}</p>{{end}}<h2>Checks</h2><table>{{range .Checks}}<tr><th>{{.ID}}</th><td>{{.Status}}</td><td>{{.Evidence}}</td></tr>{{end}}</table><h2>Phases</h2><table>{{range .Steps}}<tr><th>{{.Name}}</th><td>{{.Status}}</td><td>{{printf "%.3f" .Seconds}} s</td></tr>{{end}}</table><h2>Coverage and limitations</h2><ul>{{range .Limitations}}<li>{{.}}</li>{{end}}</ul></html>`))
 	f, err := os.OpenFile(filepath.Join(dir, "report.html"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
@@ -106,13 +107,18 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		return "", err
 	}
 	dir = s.Dir
-	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "All 10 fixture attachments checked; no production or third-party workflow coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "Single external TCP endpoint checked; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "JSON journal only; SQLite history and automated crash retry remain M3"}}
+	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "Required coverage: all 10 fixture attachments; see individual check status for executed coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "JSON journal only; SQLite history and automated crash retry remain M3"}}
+	if operation == "run" {
+		for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
+			r.Checks = append(r.Checks, Check{id, true, "skipped", "verification phase not reached"})
+		}
+	}
 	// Establish a durable initial report for manual cleanup after an uncatchable crash.
 	if err = r.write(dir); err != nil {
 		return dir, err
 	}
 	defer func() {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil && r.Verification != "failed" {
 			r.Verification = "canceled"
 		}
 		if err != nil {
@@ -291,15 +297,15 @@ func Backup(ctx context.Context, root, out string, images Images, omit bool) (st
 		}
 		return r.step("backup", func() (backupErr error) {
 			started := time.Now().UTC()
-			if err := s.compose(ctx, "stop", "--timeout", "10", "app"); err != nil {
-				return err
-			}
 			// Always resume the source, including dump/tar/publish failure, before cleanup.
 			defer func() {
 				resume, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				backupErr = errors.Join(backupErr, s.compose(resume, "start", "app"))
 			}()
+			if err := s.compose(ctx, "stop", "--timeout", "10", "app"); err != nil {
+				return err
+			}
 			if err := toFile(ctx, filepath.Join(partial, "database.dump"), "exec", db, "pg_dump", "-U", "demo", "-d", "documents", "--format=custom", "--no-owner", "--no-acl"); err != nil {
 				return err
 			}
@@ -329,7 +335,12 @@ func Backup(ctx context.Context, root, out string, images Images, omit bool) (st
 			if err = os.Rename(partial, out); err != nil {
 				return err
 			}
+			published, err := source.Load(out)
+			if err != nil {
+				return err
+			}
 			r.BackupID = m.BackupID
+			r.Backup = &published
 			return nil
 		})
 	})
@@ -348,6 +359,7 @@ func Run(ctx context.Context, root, bundle string, images Images) (string, error
 			return errors.New("backup images do not match the trusted local image lock")
 		}
 		r.BackupID = m.BackupID
+		r.Backup = &m
 		if err := r.step("restoring", func() error {
 			if err := s.startDB(ctx); err != nil {
 				return err
@@ -454,6 +466,9 @@ func RecoverCleanup(ctx context.Context, dir string) error {
 		r.Cleanup = "failed"
 	}
 	r.Remaining = s.Resources
+	if err == nil && r.Verification == "passed" {
+		r.Error = ""
+	}
 	if r.Finished.IsZero() {
 		r.Verification = "inconclusive"
 		r.Error = "interrupted execution; cleanup only, no verification resumed"

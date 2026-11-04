@@ -168,7 +168,23 @@ def main():
         (bad_dump / 'database.dump').write_bytes(b'PGDMPinvalid-format')
         rehash(bad_dump)
         report, _ = invoke('restore-error', 'run', '--bundle', bad_dump, success=False)
-        expect(not report['checks'] and any(s['name'] == 'restoring' and s['status'] == 'error' for s in report['steps']), 'restore error not isolated')
+        expect(all(c['status'] == 'skipped' for c in report['checks']) and any(s['name'] == 'restoring' and s['status'] == 'error' for s in report['steps']), 'restore error not isolated')
+        clean(report)
+
+        # Force pg_dump failure after the source app has stopped. The resume command
+        # must run even though the incomplete bundle is not published.
+        backup_shim = output / 'backup-shim'
+        backup_shim.mkdir()
+        marker = output / 'source-resumed'
+        shim_file = backup_shim / 'docker'
+        shim_file.write_text('#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nargs=sys.argv[1:]\n'
+                             'if "pg_dump" in args: sys.exit(1)\n'
+                             f'if args[:1]==["compose"] and args[-2:]==["start","app"]: Path({str(marker)!r}).touch()\n'
+                             'os.execv("/usr/bin/docker", ["docker", *args])\n')
+        shim_file.chmod(0o700)
+        report, _ = invoke('backup-error-resumes-source', 'backup', '--out', output / 'failed-backup', success=False,
+                           env=dict(ENV, PATH=str(backup_shim) + ':' + os.environ['PATH']))
+        expect(marker.exists() and not (output / 'failed-backup').exists(), 'failed backup did not resume source or was published')
         clean(report)
 
         interrupt('cancel-with-live-resources', signal.SIGTERM)
