@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/05zhi/compose-recovery-lab/internal/state"
 	"io"
 	"os"
 	"os/exec"
@@ -33,6 +34,8 @@ type Session struct {
 	Resources []Resource `json:"resources"`
 	Images    Images     `json:"images"`
 	password  string
+	store     *state.Store
+	logicalID string
 }
 
 func randomID() string {
@@ -94,7 +97,19 @@ func NewSession(root string, images Images) (*Session, error) {
 	}
 	return s, nil
 }
-func (s *Session) save() error { return writeJSON(filepath.Join(s.Dir, "resources.json"), s) }
+func (s *Session) save() error {
+	if err := writeJSON(filepath.Join(s.Dir, "resources.json"), s); err != nil {
+		return err
+	}
+	if s.store != nil {
+		rs := []state.Resource{}
+		for _, r := range s.Resources {
+			rs = append(rs, state.Resource{Kind: r.Kind, ID: r.ID})
+		}
+		return s.store.Resources(s.ID, rs)
+	}
+	return nil
+}
 
 func LoadSession(dir string) (*Session, error) {
 	data, err := os.ReadFile(filepath.Join(dir, "resources.json"))

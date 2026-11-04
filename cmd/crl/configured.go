@@ -59,6 +59,10 @@ func configured(command, filename string, offline bool) int {
 		return 1
 	}
 	defer lock.Close()
+	if err = runner.Reconcile(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
 	dir, err := runner.RunConfigured(ctx, p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)
 	if dir != "" {
 		fmt.Println("report:", filepath.Join(dir, "report.json"))

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/05zhi/compose-recovery-lab/internal/source"
+	"github.com/05zhi/compose-recovery-lab/internal/state"
 )
 
 type Check struct {
@@ -30,6 +31,11 @@ type Step struct {
 	Status  string    `json:"status"`
 }
 type Report struct {
+	LogicalRunID string `json:"logical_run_id"`
+	AttemptID    string `json:"attempt_id"`
+	Phase        string `json:"phase"`
+	store        *state.Store
+	dir          string
 	ConfigHash   string           `json:"config_hash,omitempty"`
 	RunID        string           `json:"run_id"`
 	Operation    string           `json:"operation"`
@@ -49,6 +55,15 @@ type Report struct {
 
 func (r *Report) step(name string, fn func() error) error {
 	start := time.Now().UTC()
+	r.Phase = name
+	if r.store != nil {
+		if err := r.store.Phase(r.RunID, name, "running"); err != nil {
+			return err
+		}
+		if err := r.write(r.dir); err != nil {
+			return err
+		}
+	}
 	fmt.Fprintln(os.Stderr, name)
 	err := fn()
 	status := "passed"
@@ -56,10 +71,22 @@ func (r *Report) step(name string, fn func() error) error {
 		status = "error"
 	}
 	r.Steps = append(r.Steps, Step{name, start, time.Since(start).Seconds(), status})
+	if r.store != nil {
+		err = errors.Join(err, r.store.Phase(r.RunID, name, status), r.write(r.dir))
+	}
 	return err
 }
 
 func (r *Report) write(dir string) error {
+	if r.store != nil {
+		b, e := json.Marshal(r)
+		if e != nil {
+			return e
+		}
+		if e = r.store.Snapshot(r.RunID, b); e != nil {
+			return e
+		}
+	}
 	if err := writeJSON(filepath.Join(dir, "report.json"), r); err != nil {
 		return err
 	}
@@ -108,7 +135,23 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		return "", err
 	}
 	dir = s.Dir
-	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "Required coverage: all 10 fixture attachments; see individual check status for executed coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "JSON journal only; SQLite history and automated crash retry remain M3"}}
+	s.store, err = state.OpenDefault()
+	if err != nil {
+		return dir, err
+	}
+	defer s.store.Close()
+	parent, _ := ctx.Value(retryKey{}).(string)
+	s.logicalID, err = s.store.Start(s.ID, parent, s.Dir, operation)
+	if err != nil {
+		return dir, err
+	}
+	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "Required coverage: all 10 fixture attachments; see individual check status for executed coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "SQLite attempts retain previous evidence; retry always restores into fresh resources"}}
+	r.ConfigHash, _ = ctx.Value(configHashKey{}).(string)
+	r.store = s.store
+	r.dir = dir
+	r.LogicalRunID = s.logicalID
+	r.AttemptID = s.ID
+	r.Phase = "queued"
 	if operation == "run" {
 		for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
 			r.Checks = append(r.Checks, Check{id, true, "skipped", "verification phase not reached"})
@@ -134,6 +177,7 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		}
 		r.Remaining = s.Resources
 		r.Finished = time.Now().UTC()
+		r.Phase = "finished"
 		// Only the private staging child created by this run is removed, never a source path.
 		stageErr := os.RemoveAll(filepath.Join(dir, "staged"))
 		if stageErr != nil {
@@ -351,7 +395,7 @@ func Run(ctx context.Context, root, bundle string, images Images) (string, error
 	return runBundle(ctx, root, bundle, images, "", "")
 }
 func RunConfigured(ctx context.Context, root, bundle string, images Images, configHash, manifestHash string) (string, error) {
-	return runBundle(ctx, root, bundle, images, configHash, manifestHash)
+	return runBundle(context.WithValue(ctx, configHashKey{}, configHash), root, bundle, images, configHash, manifestHash)
 }
 func runBundle(ctx context.Context, root, bundle string, images Images, configHash, manifestHash string) (string, error) {
 	return execute(ctx, root, "run", images, func(ctx context.Context, s *Session, r *Report) error {
@@ -467,15 +511,36 @@ func RecoverCleanup(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
+	s.store, err = state.OpenDefault()
+	if err != nil {
+		return err
+	}
+	defer s.store.Close()
+	if _, e := s.store.Get(s.ID, true); e != nil {
+		if _, e = s.store.Start(s.ID, "", s.Dir, "recovered"); e != nil {
+			return e
+		}
+	}
 	err = s.Cleanup(ctx)
 	data, readErr := os.ReadFile(filepath.Join(dir, "report.json"))
 	if readErr != nil {
-		return errors.Join(err, readErr)
+		record, e := s.store.Get(s.ID, true)
+		if e != nil {
+			return errors.Join(err, e)
+		}
+		data = record.Report
 	}
 	var r Report
 	if e := json.Unmarshal(data, &r); e != nil {
 		return errors.Join(err, e)
 	}
+	if r.RunID == "" {
+		r.RunID = s.ID
+		r.Verification = "inconclusive"
+	}
+	r.store = s.store
+	r.dir = dir
+	r.AttemptID = s.ID
 	r.Cleanup = "complete"
 	if err != nil {
 		r.Cleanup = "failed"
@@ -485,13 +550,42 @@ func RecoverCleanup(ctx context.Context, dir string) error {
 		r.Error = ""
 	}
 	if r.Finished.IsZero() {
-		r.Verification = "inconclusive"
+		if r.Verification != "failed" {
+			r.Verification = "inconclusive"
+		}
 		r.Error = "interrupted execution; cleanup only, no verification resumed"
 		r.Finished = time.Now().UTC()
+		r.Phase = "finished"
 	}
 	stageErr := os.RemoveAll(filepath.Join(dir, "staged"))
 	if stageErr != nil {
 		r.Cleanup = "failed"
 	}
 	return errors.Join(err, stageErr, r.write(dir))
+}
+
+type configHashKey struct{}
+type retryKey struct{}
+
+func RetryContext(ctx context.Context, parent string) context.Context {
+	return context.WithValue(ctx, retryKey{}, parent)
+}
+
+// Reconcile is called while the account-wide execution lock is held.
+func Reconcile(ctx context.Context) error {
+	db, err := state.OpenDefault()
+	if err != nil {
+		return err
+	}
+	items, err := db.List(1000, true)
+	db.Close()
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if err = RecoverCleanup(ctx, item.Dir); err != nil {
+			return errors.New("prior attempt cleanup failed; new run blocked")
+		}
+	}
+	return nil
 }

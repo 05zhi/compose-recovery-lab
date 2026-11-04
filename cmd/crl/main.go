@@ -21,6 +21,9 @@ func run() int {
 		return 2
 	}
 	command := os.Args[1]
+	if command == "history" || command == "status" || command == "report" || command == "recover" || command == "retry" {
+		return historyCommand(command, os.Args[2:])
+	}
 	if command != "backup" && command != "run" && command != "cleanup" && command != "doctor" && command != "plan" {
 		fmt.Fprintln(os.Stderr, "unsupported command")
 		return 2
@@ -77,6 +80,10 @@ func run() int {
 		}
 		fmt.Println("cleanup complete")
 		return 0
+	}
+	if err = runner.Reconcile(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
 	}
 	var images runner.Images
 	data, err := os.ReadFile(*lockfile)
