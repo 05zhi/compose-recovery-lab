@@ -5,6 +5,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True,help='new private Linux evidence directory');p.add_argument('--resume',action='store_true',help='retain successful suites and preserve failed output before rerunning');a=p.parse_args();base=a.output.resolve();base.mkdir(mode=0o700,parents=True,exist_ok=a.resume)
     cases=[('m2',['--output',base/'m2']),('m1',['--output',base/'m1-document']),('m6',['--template','document-app','--output',base/'m6-document']),('m1',['--template','inventory-app','--output',base/'m1-inventory']),('m6',['--template','inventory-app','--output',base/'m6-inventory']),('m3',['--fixture',base/'m2','--output',base/'m3-document']),('m3',['--fixture',base/'m6-inventory','--output',base/'m3-inventory']),('m4',['--fixture',base/'m2','--output',base/'m4']),('m5',['--fixture',base/'m2','--output',base/'m5']),('diagnostics',['--fixture',base/'m1-document','--output',base/'diagnostics'])]
+    cases += [('browser_failure',['--template',name,'--output',base/('browser-signals-'+name)]) for name in ('document-app','inventory-app')]
     results=[]
     if a.resume:
         results=json.loads((base/'suite-results.json').read_text())

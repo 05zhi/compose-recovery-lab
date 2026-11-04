@@ -85,7 +85,7 @@ if all(c['status']=='passed' for c in result):
         for file in Path('/tmp/evidence').glob('*.webm'):file.unlink()
         try:browser_smoke();history.append({'iteration':i,'status':'passed'})
         except Exception as error:
-            evidence=failure_evidence(error);history.append({'iteration':i,'status':'failed','evidence':evidence,'native_frames':[line for line in str(error).splitlines() if re.search(r'\\[err\\] (?:#\\d+ 0x|Received signal)',line)][:32]})
+            evidence=failure_evidence(error);history.append({'iteration':i,'status':'failed','evidence':evidence,'native_frames':[line for line in str(error).splitlines() if re.search(r'\\[err\\] (?:#\\d+ 0x|Received signal|\\s*(?:r8|r12|di|dx|ip|efl|cs|err|trp|old|cr2):)',line)][:32]})
             for c in result:
                 if c['id'] in ('login-search-download','inventory-export'):c.update(status='failed',evidence=evidence)
             break

@@ -5,7 +5,7 @@ from pathlib import Path
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--image',required=True,help='immutable trusted image ID')
-    parser.add_argument('--mode',choices=['shell','chromium','configured'],required=True)
+    parser.add_argument('--mode',choices=['shell','chromium'],required=True)
     parser.add_argument('--runs',type=int,default=300)
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
@@ -53,12 +53,8 @@ for i in range(RUNS):
     stage='launch'
     try:
         with sync_playwright() as p:
-            if MODE=='configured':
-                from browser_runtime import launch_browser
-                browser=launch_browser(p)
-            else:
-                kwargs={'channel':'chromium'} if MODE=='chromium' else {}
-                browser=p.chromium.launch(args=['--disable-dev-shm-usage'],**kwargs)
+            kwargs={'channel':'chromium'} if MODE=='chromium' else {}
+            browser=p.chromium.launch(args=['--disable-dev-shm-usage'],**kwargs)
             if i==0:print(json.dumps({'browser_version':browser.version}),flush=True)
             stage='context';context=browser.new_context(record_video_dir=str(folder),viewport={'width':1280,'height':720})
             stage='page';page=context.new_page()
