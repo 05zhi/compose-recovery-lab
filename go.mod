@@ -6,3 +6,5 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	go.yaml.in/yaml/v3 v3.0.4
 )
+
+require github.com/mattn/go-sqlite3 v1.14.32
