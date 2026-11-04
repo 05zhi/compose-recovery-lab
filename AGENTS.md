@@ -2,7 +2,7 @@
 
 ## 任務範圍
 
-先閱讀 `docs/OPERATIONS.zh-TW.md` 與 `docs/M3_M6_ACCEPTANCE.zh-TW.md`。目前已完成 M1／M2 固定合成模板的垂直切片、版本化設定與 doctor／plan；實際驗收與限制以進度紀錄為準。新的功能實作需依使用者後續指示推進，不把 M3–M6 規劃中的功能描述為已完成。
+先閱讀 `docs/OPERATIONS.zh-TW.md` 與 `docs/M3_M6_ACCEPTANCE.zh-TW.md`。M1–M5 已驗收；M6 已完成兩個合成模板的本機工程驗收，真人獨立試用仍待回饋。實際範圍與限制以 `docs/M3_M6_ACCEPTANCE.zh-TW.md` 為準。後續功能依使用者指示推進，不把未執行的試用、其他平台或冷 VM 驗證描述為已完成。
 
 ## 必須遵守的版本控制規則
 

@@ -34,3 +34,11 @@ Python digest：`sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcad
 應用映像以本機建置結果的 immutable image ID 固定；`scripts/prepare-images.py` 產生不提交的 `examples/document-app/images.lock.json`。報告與 manifest 記錄這個 ID。重建後若 ID 改變，需重新製作 fixture 備份；不可用新映像冒充舊備份版本。
 
 參考：[Docker Ubuntu 安裝](https://docs.docker.com/engine/install/ubuntu/)、[Go releases](https://go.dev/dl/)。本次實際採用 Ubuntu 發行套件，沒有宣稱是 Docker 官方 APT repo 安裝。
+
+
+## M3–M6 增補
+
+- SQLite Go driver：github.com/mattn/go-sqlite3 v1.14.32；CGO／GCC 編譯，執行檔限已驗證的 Linux amd64／glibc 環境。
+- Playwright Python：1.58.0；Chromium headless shell 與 ffmpeg 在映像準備階段安裝。兩個 adapter 都固定建置後 image ID。
+- `scripts/prepare-images.py` 產生 document-app 與 inventory-app 各自的 images.lock.json。建置 context 只複製明確允許的檔案，不包含來源備份或 reports。
+- 本機套件解壓與新 HOME 驗收使用既有可信映像快取；沒有把它描述成另一台全新 VM 的安裝結果。
