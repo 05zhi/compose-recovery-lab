@@ -90,11 +90,17 @@ def execute(spec):
             if scope['size'] > len(result):
                 raise AssertionFailure('sample exceeds population')
             selected = random.Random(scope['seed']).sample(result, scope['size'])
-        coverage = {'mode': scope['mode'], 'population': len(result), 'checked': len(selected), 'unchecked': len(result) - len(selected)}
+        coverage = {'mode': scope['mode'], 'population': len(result), 'checked': 0, 'unchecked': len(result)}
         if scope['mode'] == 'sample':
             coverage['seed'] = scope['seed']
         for name, digest in selected:
-            if digest_file(name) != digest:
+            coverage['checked'] += 1
+            coverage['unchecked'] -= 1
+            try:
+                matched = digest_file(name) == digest
+            except AssertionFailure as error:
+                return False, {'reason': str(error)}, coverage
+            if not matched:
                 return False, {'reason': 'attachment content differs from database hash'}, coverage
         return True, {'database_references_match': True}, coverage
     if kind == 'http':

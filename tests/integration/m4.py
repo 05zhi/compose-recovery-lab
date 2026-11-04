@@ -1,11 +1,16 @@
 """Real restored PostgreSQL and isolated HTTP/file checker acceptance."""
-import copy,json,subprocess,tarfile
+import argparse,copy,json,subprocess,tarfile
 from pathlib import Path
-BASE=Path('/tmp/crl-m4-acceptance');BASE.mkdir(mode=0o700)
+# Serialize acceptance suites; each CLI still enforces its independent account lock.
+import fcntl
+_suite_lock = open(Path.home() / '.crl-acceptance.lock', 'a')
+fcntl.flock(_suite_lock, fcntl.LOCK_EX)
+
+p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--fixture',type=Path,required=True);args=p.parse_args();BASE=args.output.resolve();BASE.mkdir(mode=0o700);fixture=args.fixture.resolve()
 CLI=str(Path('bin/crl').resolve())
-c=json.loads(Path('/tmp/crl-m2-acceptance-final/drill.yaml').read_text())
-c['backup']['path']='/tmp/crl-m2-acceptance-final/bundle'
-c['runtime'].update(images_file='/tmp/crl-m2-acceptance-final/images.json',work_dir=str(BASE/'work'),timeout='3m')
+c=json.loads((fixture/'drill.yaml').read_text())
+c['backup']['path']=str(fixture/'bundle')
+c['runtime'].update(images_file=str((fixture/c['runtime']['images_file']).resolve()),work_dir=str(BASE/'work'),timeout='3m')
 with tarfile.open(Path(c['backup']['path'])/'uploads.tar') as tf:
  import hashlib
  digest=hashlib.sha256(tf.extractfile('document-01.txt').read()).hexdigest()
@@ -31,7 +36,9 @@ bad=copy.deepcopy(c);bad['checks'][5]['sha256']='0'*64;run('file-mismatch',bad,'
 bad=copy.deepcopy(c);bad['checks'][6]['query']="SELECT '../escape', repeat('0',64)";bad['checks'][6]['scope']={'mode':'all'};run('db-path-escape',bad,'failed')
 bad=copy.deepcopy(c);bad['checks'][7]['status']=404;run('http-mismatch',bad,'failed')
 bad=copy.deepcopy(c);bad['checks'][4]['query']="SELECT pg_sleep(7)";run('sql-timeout',bad,'inconclusive')
-bad=copy.deepcopy(c);bad['checks'][4]['query']="SELECT nextval('documents_id_seq')";run('sql-write-denied',bad,'inconclusive')
+bad=copy.deepcopy(c);bad['checks'][4]['query']="SELECT lo_create(0)";run('sql-write-denied',bad,'inconclusive')
 bad=copy.deepcopy(c);bad['checks'][4]['query']='SELECT 1 UNION ALL SELECT 2';run('sql-row-limit',bad,'failed')
 bad=copy.deepcopy(c);bad['checks'][4]['query']="SELECT 1); DELETE FROM documents; SELECT 1 --";run('stacked-query-denied',bad,'inconclusive')
+bad=copy.deepcopy(c);bad['checks'][6]['query']="SELECT '../escape', repeat('0',64) FROM generate_series(1,10)";bad['checks'][6]['scope']={'mode':'all'};r=run('early-failure-coverage',bad,'failed');coverage=next(x for x in r['checks'] if x['id']=='sample')['coverage'];assert coverage['checked']==1 and coverage['unchecked']==9
+safe=copy.deepcopy(c);safe['checks'][4]['query']="SELECT has_table_privilege(current_user, 'documents','INSERT') OR has_database_privilege(current_user,current_database(),'TEMP')";safe['checks'][4]['expect']['value']=False;run('restricted-role',safe,'passed')
 print('M4 acceptance PASS',flush=True)
