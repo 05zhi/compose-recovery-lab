@@ -21,6 +21,8 @@ def failure_evidence(error):
     if category == 'operation':
         message = str(error)
         for signature, code in (
+            ('signal=SIGSEGV', 'browser-sigsegv'),
+            ('signal=SIGABRT', 'browser-sigabrt'),
             ('No space left on device', 'disk-full'),
             ('pthread_create', 'thread-create'),
             ('Executable doesn', 'browser-executable'),
@@ -33,6 +35,6 @@ def failure_evidence(error):
     location = 'unknown'
     for frame in traceback.extract_tb(error.__traceback__):
         name = Path(frame.filename).name
-        if name in ('probe.py', 'smoke.py', 'browser_smoke.py'):
+        if name in ('probe.py', 'smoke.py', 'browser_smoke.py', 'browser_runtime.py'):
             location = name + ':' + str(frame.lineno)
     return 'check failed; category=' + category + '; location=' + location

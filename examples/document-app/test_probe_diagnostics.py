@@ -8,7 +8,7 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(failure_evidence(error), 'check failed; category=http-503; location=unknown')
 
     def test_fixed_browser_categories_do_not_leak_raw_errors(self):
-        for text, kind in [('pthread_create secret', 'thread-create'), ('No space left on device secret','disk-full'), ('Target page, context or browser has been closed secret','browser-closed'), ('unknown password=secret','operation')]:
+        for text, kind in [('Target page, context or browser has been closed password=secret signal=SIGSEGV', 'browser-sigsegv'), ('signal=SIGABRT secret', 'browser-sigabrt'), ('pthread_create secret', 'thread-create'), ('No space left on device secret','disk-full'), ('Target page, context or browser has been closed secret','browser-closed'), ('unknown password=secret','operation')]:
             with self.subTest(kind=kind):
                 self.assertEqual(failure_evidence(RuntimeError(text)), 'check failed; category='+kind+'; location=unknown')
 
