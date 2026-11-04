@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/05zhi/compose-recovery-lab/internal/runner"
+	"github.com/05zhi/compose-recovery-lab/internal/templates"
 )
 
 func main() { os.Exit(run()) }
 func run() int {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: crl backup|run|cleanup|doctor|plan [flags]")
+		fmt.Fprintln(os.Stderr, "usage: crl backup|run|cleanup|doctor|plan|history|status|report|recover|retry|notify [flags]")
 		return 2
 	}
 	command := os.Args[1]
@@ -40,6 +41,7 @@ func run() int {
 	output := flags.String("out", "", "new backup bundle directory")
 	bundle := flags.String("bundle", "", "completed local backup bundle")
 	runDir := flags.String("run-dir", "", "run directory for cleanup")
+	templateID := flags.String("template", "document-app-v1", "backup fixture template")
 	omit := flags.Bool("omit-attachment", false, "create a valid bundle missing one synthetic attachment")
 	timeout := flags.Duration("timeout", 10*time.Minute, "total operation timeout; cleanup has independent 60s budget")
 	if err := flags.Parse(os.Args[2:]); err != nil {
@@ -99,7 +101,11 @@ func run() int {
 	}
 	var dir string
 	if command == "backup" {
-		dir, err = runner.Backup(ctx, *root, *output, images, *omit)
+		if _, ok := templates.Get(*templateID); !ok {
+			fmt.Fprintln(os.Stderr, "unknown template")
+			return 2
+		}
+		dir, err = runner.Backup(runner.TemplateContext(ctx, *templateID), *root, *output, images, *omit)
 	} else {
 		dir, err = runner.Run(ctx, *root, *bundle, images)
 	}

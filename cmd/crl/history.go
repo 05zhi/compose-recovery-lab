@@ -127,7 +127,7 @@ func historyCommand(command string, args []string) int {
 			fmt.Fprintln(os.Stderr, "retry environment not ready")
 			return 1
 		}
-		dir, e := runner.RunConfigured(runner.CheckContext(runner.RetryContext(ctx, record.ID), c.Checks), p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)
+		dir, e := runner.RunConfigured(runner.TemplateContext(runner.CheckContext(runner.RetryContext(ctx, record.ID), c.Checks), c.Template), p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)
 		fmt.Println("report:", filepath.Join(dir, "report.json"))
 		if e != nil {
 			fmt.Fprintln(os.Stderr, e)

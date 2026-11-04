@@ -124,6 +124,9 @@ func Build(c config.Config) (Plan, error) {
 	if err != nil || string(before) != string(after) {
 		return p, errors.New("manifest changed during planning")
 	}
+	if manifest.AppVersion != c.Template {
+		return p, errors.New("manifest template differs from configuration")
+	}
 	if images.Postgres != manifest.PostgresImage || images.App != manifest.AppImage {
 		return p, errors.New("manifest images differ from trusted image lock")
 	}
@@ -132,7 +135,7 @@ func Build(c config.Config) (Plan, error) {
 		Resources:   []string{"2 containers: db, app (random run ID)", "1 internal network; no published host ports", "2 new volumes: database, uploads; no host bind mounts", "1 private attempt directory; generated credentials never included in plan"},
 		Steps:       []string{"verify local images and free space", "copy and revalidate bundle; enforce planned manifest hash", "create fresh PostgreSQL 17 and non-superuser demo role", "restore custom dump without source owner/ACL", "restore validated attachments to uploads volume", "start application and replace synthetic login password", "run all required template checks", "cross-check ownership and remove created resources; write JSON/HTML reports"},
 		Limits:      map[string]any{"timeout": c.Runtime.Timeout, "container_memory_bytes": 512 << 20, "container_cpus": 1, "container_pids": 128, "minimum_free_workspace_bytes": 1 << 30, "maximum_bundle_file_bytes": source.MaxFileSize, "maximum_expanded_upload_bytes": source.MaxUploadsSize, "maximum_tar_entries": source.MaxFiles},
-		Limitations: []string{"Offline plan only; environment availability checked by doctor, not plan", "Only document-app-v1 and fixed role mappings supported; arbitrary Compose rejected; bounded declarative checks supported", "Hash integrity is not source authenticity or proof of complete application data", "Original owner/ACL and login password are not preserved; no third-party workflow coverage", "Actual resources use a new run ID; cleanup may require manual retry after uncatchable termination"}}
+		Limitations: []string{"Offline plan only; environment availability checked by doctor, not plan", "Only document-app-v1/inventory-app-v1 and fixed role mappings supported; arbitrary Compose rejected; bounded declarative checks supported", "Hash integrity is not source authenticity or proof of complete application data", "Original owner/ACL and login password are not preserved; no third-party workflow coverage", "Actual resources use a new run ID; cleanup may require manual retry after uncatchable termination"}}
 	for _, role := range []string{"database", "uploads", "app_config"} {
 		file := expected[role]
 		meta := manifest.Files[file]

@@ -22,7 +22,10 @@
       "pattern": "^[a-z][a-z0-9-]{0,62}$"
     },
     "template": {
-      "const": "document-app-v1"
+      "enum": [
+        "document-app-v1",
+        "inventory-app-v1"
+      ]
     },
     "backup": {
       "type": "object",
@@ -102,7 +105,9 @@
                   "sql-documents",
                   "database-files",
                   "login-search-download",
-                  "external-connectivity"
+                  "external-connectivity",
+                  "sql-inventory",
+                  "inventory-export"
                 ]
               },
               "required": {

@@ -63,7 +63,7 @@ func configured(command, filename string, offline bool) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	dir, err := runner.RunConfigured(runner.CheckContext(ctx, c.Checks), p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)
+	dir, err := runner.RunConfigured(runner.TemplateContext(runner.CheckContext(ctx, c.Checks), c.Template), p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)
 	if dir != "" {
 		fmt.Println("report:", filepath.Join(dir, "report.json"))
 	}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/05zhi/compose-recovery-lab/internal/checks"
+	"github.com/05zhi/compose-recovery-lab/internal/templates"
 	"html/template"
 	"io"
 	"os"
@@ -164,7 +165,8 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 	if err != nil {
 		return dir, err
 	}
-	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "Required coverage: all 10 fixture attachments; see individual check status for executed coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "SQLite attempts retain previous evidence; retry always restores into fresh resources"}}
+	definition, _ := templates.Get(templateFrom(ctx))
+	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"Trusted synthetic templates only; not an arbitrary Compose runner", "See each check for executed coverage; no claim about untested workflows", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "SQLite attempts retain previous evidence; retry always restores into fresh resources"}}
 	r.ReportVersion = 1
 	r.ToolVersion = "0.3.0-dev"
 	r.Environment = map[string]any{"os": runtime.GOOS, "arch": runtime.GOARCH, "cpus": runtime.NumCPU(), "go": runtime.Version()}
@@ -183,8 +185,14 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 	r.AttemptID = s.ID
 	r.Phase = "queued"
 	if operation == "run" {
-		for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
-			r.Checks = append(r.Checks, Check{ID: id, Required: true, Status: "skipped", Evidence: "verification phase not reached"})
+		specs, ok := ctx.Value(checkKey{}).([]checks.Spec)
+		if !ok {
+			for _, id := range definition.Checks {
+				specs = append(specs, checks.Spec{ID: id, Required: true})
+			}
+		}
+		for _, spec := range specs {
+			r.Checks = append(r.Checks, Check{ID: spec.ID, Required: spec.Required, Status: "skipped", Evidence: "verification phase not reached"})
 		}
 	}
 	// Establish a durable initial report for manual cleanup after an uncatchable crash.
@@ -192,6 +200,11 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		return dir, err
 	}
 	defer func() {
+		for _, check := range r.Checks {
+			if check.Status == "failed" {
+				r.Verification = "failed"
+			}
+		}
 		if ctx.Err() != nil && r.Verification != "failed" {
 			r.Verification = "canceled"
 		}
@@ -202,6 +215,9 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		defer cancel()
 		cleanupErr := r.step("cleaning", func() error { return s.Cleanup(cleanupCtx) })
 		r.Cleanup = "complete"
+		if cleanupErr == nil {
+			_ = os.Remove(filepath.Join(dir, "compose.json"))
+		}
 		if cleanupErr != nil {
 			r.Cleanup = "failed"
 		}
@@ -390,19 +406,20 @@ func Backup(ctx context.Context, root, out string, images Images, omit bool) (st
 			}
 			omitName := ""
 			if omit {
-				omitName = "document-01.txt"
+				definition, _ := templates.Get(templateFrom(ctx))
+				omitName = definition.OmitFile
 			}
 			count, err := normalizeTar(raw, filepath.Join(partial, "uploads.tar"), omitName)
 			os.Remove(raw)
 			if err != nil {
 				return err
 			}
-			if err = os.WriteFile(filepath.Join(partial, "app-config.sanitized.json"), []byte("{\"app\":\"document-app-v1\",\"read_only_api\":true}\n"), 0600); err != nil {
+			if err = os.WriteFile(filepath.Join(partial, "app-config.sanitized.json"), []byte(fmt.Sprintf("{\"app\":%q,\"read_only_api\":true}\n", templateFrom(ctx))), 0600); err != nil {
 				return err
 			}
-			m := source.Manifest{SchemaVersion: 1, BackupID: "backup-" + randomID(), AppVersion: "document-app-v1", PostgresMajor: 17, PostgresImage: images.Postgres, AppImage: images.App, Extensions: []string{"plpgsql"}, StartedAt: started, FinishedAt: time.Now().UTC(), AttachmentCount: count, Consistency: "read-only fixture API stopped during pg_dump and attachment capture", Limitations: []string{"synthetic data only; no external writers; original owner/ACL excluded"}}
+			m := source.Manifest{SchemaVersion: 1, BackupID: "backup-" + randomID(), AppVersion: templateFrom(ctx), PostgresMajor: 17, PostgresImage: images.Postgres, AppImage: images.App, Extensions: []string{"plpgsql"}, StartedAt: started, FinishedAt: time.Now().UTC(), AttachmentCount: count, Consistency: "read-only fixture API stopped during pg_dump and attachment capture", Limitations: []string{"synthetic data only; no external writers; original owner/ACL excluded"}}
 			if omit {
-				m.Limitations = append(m.Limitations, "fault injection: document-01.txt intentionally omitted")
+				m.Limitations = append(m.Limitations, "fault injection: first template attachment intentionally omitted")
 			}
 			if err = source.WriteManifest(partial, m); err != nil {
 				return err
@@ -422,6 +439,10 @@ func Backup(ctx context.Context, root, out string, images Images, omit bool) (st
 }
 
 func Run(ctx context.Context, root, bundle string, images Images) (string, error) {
+	m, err := source.Load(bundle)
+	if err == nil {
+		ctx = TemplateContext(ctx, m.AppVersion)
+	}
 	return runBundle(ctx, root, bundle, images, "", "")
 }
 func RunConfigured(ctx context.Context, root, bundle string, images Images, configHash, manifestHash string) (string, error) {
@@ -544,7 +565,16 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 				}
 				return nil
 			}
-			if err = validateChecks(r.Checks); err != nil {
+			definition, _ := templates.Get(m.AppVersion)
+			specs := []checks.Spec{}
+			for _, id := range definition.Checks {
+				specs = append(specs, checks.Spec{ID: id, Required: true})
+			}
+			if result, problem := Aggregate(specs, r.Checks); problem != nil {
+				r.Verification = result
+				return problem
+			}
+			if err = validateTemplateChecks(r.Checks, definition.Checks); err != nil {
 				r.Verification = "failed"
 				return err
 			}
@@ -553,7 +583,14 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 	})
 }
 func validateChecks(checks []Check) error {
-	expected := map[string]bool{"sql-documents": false, "database-files": false, "login-search-download": false, "external-connectivity": false}
+	definition, _ := templates.Get("document-app-v1")
+	return validateTemplateChecks(checks, definition.Checks)
+}
+func validateTemplateChecks(checks []Check, ids []string) error {
+	expected := map[string]bool{}
+	for _, id := range ids {
+		expected[id] = false
+	}
 	for _, c := range checks {
 		done, ok := expected[c.ID]
 		if !ok || done || !c.Required || c.Status != "passed" {
@@ -606,6 +643,9 @@ func RecoverCleanup(ctx context.Context, dir string) error {
 	r.dir = dir
 	r.AttemptID = s.ID
 	r.Cleanup = "complete"
+	if err == nil {
+		_ = os.Remove(filepath.Join(dir, "compose.json"))
+	}
 	if err != nil {
 		r.Cleanup = "failed"
 	}

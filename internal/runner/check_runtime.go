@@ -57,3 +57,15 @@ func Aggregate(specs []checks.Spec, rows []Check) (string, error) {
 	}
 	return "passed", nil
 }
+
+type templateKey struct{}
+
+func TemplateContext(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, templateKey{}, id)
+}
+func templateFrom(ctx context.Context) string {
+	if id, ok := ctx.Value(templateKey{}).(string); ok {
+		return id
+	}
+	return "document-app-v1"
+}

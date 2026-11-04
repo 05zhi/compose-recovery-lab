@@ -80,3 +80,22 @@ func TestPublishedExample(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSecondTemplateAndCustomChecks(t *testing.T) {
+	inventory := strings.NewReplacer("document-app-v1", "inventory-app-v1", "sql-documents", "sql-inventory", "login-search-download", "inventory-export").Replace(example)
+	if _, e := Parse([]byte(inventory), t.TempDir()); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := Load("../../examples/inventory-app/drill.yaml"); e != nil {
+		t.Fatal(e)
+	}
+	custom := strings.Replace(example, "report:", "  - {id: total, type: sql, required: true, query: 'SELECT count(*) FROM documents', expect: {operator: eq, value: 10}}\nreport:", 1)
+	if _, e := Parse([]byte(custom), t.TempDir()); e != nil {
+		t.Fatal(e)
+	}
+	for _, bad := range []string{strings.Replace(inventory, "sql-inventory", "sql-documents", 1), strings.Replace(custom, "id: total", "id: sql-documents", 1), strings.Replace(custom, "SELECT count(*) FROM documents", "DELETE FROM documents", 1)} {
+		if _, e := Parse([]byte(bad), t.TempDir()); e == nil {
+			t.Fatal("invalid checker accepted")
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/05zhi/compose-recovery-lab/internal/templates"
 	"io"
 	"os"
 	"path"
@@ -118,7 +119,7 @@ func Load(dir string) (Manifest, error) {
 	if err = strictjson.Decode(data, &m); err != nil {
 		return m, err
 	}
-	if m.SchemaVersion != 1 || m.PostgresMajor != 17 || m.AppVersion != "document-app-v1" || m.BackupID == "" {
+	if m.SchemaVersion != 1 || m.PostgresMajor != 17 || !supportedTemplate(m.AppVersion) || m.BackupID == "" {
 		return m, errors.New("unsupported backup contract")
 	}
 	if len(m.Extensions) != 1 || m.Extensions[0] != "plpgsql" {
@@ -291,3 +292,5 @@ func ValidateTar(filename string) (count int, err error) {
 	}
 	return count, nil
 }
+
+func supportedTemplate(id string) bool { _, ok := templates.Get(id); return ok }

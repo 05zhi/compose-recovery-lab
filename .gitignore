@@ -37,4 +37,4 @@ __pycache__/
 Thumbs.db
 
 # Machine-local immutable app image lock
-examples/document-app/images.lock.json
+examples/*/images.lock.json

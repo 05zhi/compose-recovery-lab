@@ -127,10 +127,12 @@ def make_server(address, store, root):
                     return self.reply(200, {'status': 'ready'})
                 if not self.authorized():
                     return self.reply(401, {'error': 'authentication required'})
-                if url.path == '/documents':
+                if url.path == getattr(store,'listing_path','/documents'):
                     query = parse_qs(url.query).get('q', [''])[0]
                     rows = store.documents(query[:200])
-                    return self.reply(200, {'documents': [dict(zip(('id', 'title', 'storage_path', 'sha256'), row)) for row in rows]})
+                    return self.reply(200, {getattr(store,'listing_key','documents'): [dict(zip(('id', 'title', 'storage_path', 'sha256'), row)) for row in rows]})
+                if url.path == '/export' and hasattr(store,'export'):
+                    return self.reply(200,store.export(),binary=True)
                 if url.path.startswith('/download/'):
                     try:
                         document_id = int(url.path.removeprefix('/download/'))

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/05zhi/compose-recovery-lab/internal/templates"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -108,7 +109,24 @@ func Parse(data []byte, base string) (Config, error) {
 	if err = checks.Validate(c.Checks); err != nil {
 		return c, err
 	}
-	for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
+	definition, ok := templates.Get(c.Template)
+	if !ok {
+		return c, errors.New("unknown template")
+	}
+	for _, check := range c.Checks {
+		if check.Type == "" {
+			found := false
+			for _, id := range definition.Checks {
+				if id == check.ID {
+					found = true
+				}
+			}
+			if !found {
+				return c, errors.New("check does not belong to template")
+			}
+		}
+	}
+	for _, id := range definition.Checks {
 		found := false
 		for _, check := range c.Checks {
 			if check.ID == id && check.Type == "" && check.Required {
