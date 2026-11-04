@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../internal/config/schema.json
+schema_version: 1
+name: document-app
+template: document-app-v1
+backup:
+  type: local_bundle
+  path: ../../backups/complete
+  mapping:
+    database: database.dump
+    uploads: uploads.tar
+    app_config: app-config.sanitized.json
+runtime:
+  images_file: ./images.lock.json
+  work_dir: /var/tmp/compose-recovery-lab-runs
+  timeout: 10m
+checks:
+  - {id: sql-documents, required: true}
+  - {id: database-files, required: true}
+  - {id: login-search-download, required: true}
+  - {id: external-connectivity, required: true}
+report:
+  formats: [json, html]

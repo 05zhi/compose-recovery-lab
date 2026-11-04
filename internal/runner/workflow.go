@@ -30,6 +30,7 @@ type Step struct {
 	Status  string    `json:"status"`
 }
 type Report struct {
+	ConfigHash   string           `json:"config_hash,omitempty"`
 	RunID        string           `json:"run_id"`
 	Operation    string           `json:"operation"`
 	Started      time.Time        `json:"started_at"`
@@ -347,12 +348,26 @@ func Backup(ctx context.Context, root, out string, images Images, omit bool) (st
 }
 
 func Run(ctx context.Context, root, bundle string, images Images) (string, error) {
+	return runBundle(ctx, root, bundle, images, "", "")
+}
+func RunConfigured(ctx context.Context, root, bundle string, images Images, configHash, manifestHash string) (string, error) {
+	return runBundle(ctx, root, bundle, images, configHash, manifestHash)
+}
+func runBundle(ctx context.Context, root, bundle string, images Images, configHash, manifestHash string) (string, error) {
 	return execute(ctx, root, "run", images, func(ctx context.Context, s *Session, r *Report) error {
+		r.ConfigHash = configHash
 		staged := filepath.Join(s.Dir, "staged")
 		var m source.Manifest
 		if err := r.step("staging", func() error { var err error; m, err = source.Stage(bundle, staged); return err }); err != nil {
 			r.Verification = "failed"
 			return err
+		}
+		if manifestHash != "" {
+			digest, err := source.Digest(filepath.Join(staged, "manifest.json"))
+			if err != nil || digest.SHA256 != manifestHash {
+				r.Verification = "failed"
+				return errors.New("manifest changed after planning; create a fresh plan")
+			}
 		}
 		if m.AppImage != images.App || m.PostgresImage != images.Postgres {
 			r.Verification = "failed"
