@@ -2,7 +2,7 @@
 
 ## 任務範圍
 
-先閱讀 `docs/OPERATIONS.zh-TW.md` 與 `docs/M3_M6_ACCEPTANCE.zh-TW.md`。目前只完成規劃及 repository 初始化；新的功能實作需依使用者後續指示推進，不把規劃中的功能描述為已完成。
+先閱讀 `docs/OPERATIONS.zh-TW.md` 與 `docs/M3_M6_ACCEPTANCE.zh-TW.md`。目前已完成 M1 固定合成模板的垂直切片；實際驗收與限制以進度紀錄為準。新的功能實作需依使用者後續指示推進，不把 M2–M6 規劃中的功能描述為已完成。
 
 ## 必須遵守的版本控制規則
 

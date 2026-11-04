@@ -1,27 +1,45 @@
 # Compose Recovery Lab
 
-Docker Compose 應用的自動還原演練專案。
-
-目標是使用既有備份，在乾淨測試環境恢復資料庫、附件與網站，驗證指定的使用流程，輸出可追溯報告並清理演練資源。
+Docker Compose 應用的自動還原演練工具，以實際恢復及應用下載驗證合成備份。
 
 ## 目前狀態
 
-**M1 實作中。** 已加入文件網站 API fixture、合成資料初始化、Compose 設定與 HTTP/檔案單元測試；尚無完整還原 CLI，Docker/PostgreSQL 整合尚未驗收。使用方式見 [文件網站](examples/document-app/README.md)。
+**M1 垂直切片已實作。** 支援固定的文件網站 fixture：PostgreSQL 17 custom-format dump、10 份附件、本機備份包、全新環境恢復、登入搜尋下載、JSON/HTML 報告及資源清理。通用設定與完整 P0 尚未完成。
 
-- [詳細計畫書（繁體中文）](docs/OPERATIONS.zh-TW.md)
-- [開發與 commit 規範](AGENTS.md)
-- [里程碑紀錄](docs/M3_M6_ACCEPTANCE.zh-TW.md)
+```sh
+# 在專用 Linux 測試環境、repo 根目錄執行，需本機 Docker 權限。
+go build -buildvcs=false -o bin/crl ./cmd/crl
+python3 scripts/prepare-images.py
+bin/crl backup --out "$HOME/crl-demo/complete"
+bin/crl run --bundle "$HOME/crl-demo/complete"
 
-## 第一版目標
+# 合法但缺少一份附件的備份；最後一行預期回傳非零。
+bin/crl backup --out "$HOME/crl-demo/missing" --omit-attachment
+bin/crl run --bundle "$HOME/crl-demo/missing"
+```
 
-- Linux、Docker Compose、PostgreSQL 與一般附件目錄。
-- 從本機備份包重建一個完整應用。
-- SQL、檔案關聯、HTTP 與端到端驗證。
-- 持久化狀態、程序中斷回收、明確的資源所有權。
-- JSON/HTML 報告，清楚列出通過、失敗與未涵蓋的範圍。
+每次輸出報告路徑。預設使用私有 Linux 工作目錄，備份目的地必須不存在。Ctrl+C 會取消並清理；SIGKILL 或主機中斷後可用 `bin/crl cleanup --run-dir RUN_DIRECTORY` 明確回收。
 
-## 開發原則
+- [M1 操作手冊與限制](docs/M1_RUNBOOK.zh-TW.md)
+- [實際環境與版本](docs/ENVIRONMENT.zh-TW.md)
+- [M1 驗收紀錄](docs/M1_ACCEPTANCE.zh-TW.md)
+- [詳細計畫書](docs/OPERATIONS.zh-TW.md)
+- [進度與 commit 紀錄](docs/M3_M6_ACCEPTANCE.zh-TW.md)
+- [開發規範](AGENTS.md)
 
-每完成一個可驗收部分，先檢查、再 commit。秘密、正式備份、資料庫 dump、執行日誌及演練產物不得提交。
+## 驗證
 
-下一步為 M1：建立文件網站示範、製作合成備份，在臨時環境恢復並成功下載文件。完整規格與估時見計畫書。
+```sh
+go test ./...
+go vet ./...
+python3 -m unittest discover -s examples/document-app -v
+python3 tests/integration/m1.py
+```
+
+整合測試真的建立容器、還原資料並注入故障；需要已完成映像準備與 CLI build。測試會保留私有備份及報告，不提交 Git。
+
+## 邊界
+
+只接受使用者信任的固定合成模板；不接受任意 Compose、正式環境原地還原或任意資料庫版本。容器共享核心，內網不等於惡意程式沙箱。必要檢查未執行不算通過；驗證通過但清理失敗仍回傳非零。
+
+M2–M6 的 YAML schema、doctor/plan、SQLite 歷史、自動重試、第二應用、通用 checker 和通知仍待完成。每個可驗收部分先檢查再 commit；push 與本機提交分開處理。
