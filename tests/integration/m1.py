@@ -9,6 +9,11 @@ import io
 import json
 import os
 from pathlib import Path
+# Serialize acceptance suites; each CLI still enforces its independent account lock.
+import fcntl
+_suite_lock = open(Path.home() / '.crl-acceptance.lock', 'a')
+fcntl.flock(_suite_lock, fcntl.LOCK_EX)
+
 import shutil
 import signal
 import socket
@@ -35,19 +40,23 @@ def expect(value, message):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--template',choices=['document-app','inventory-app'],default='document-app')
     args = parser.parse_args()
     output = args.output or Path(tempfile.mkdtemp(prefix='crl-m1-acceptance-'))
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     work = output / 'runs'
     work.mkdir(mode=0o700)
     summary = []
+    images=output/'images.json';shutil.copyfile(ROOT/'examples'/args.template/'images.lock.json',images)
+    sql_id='sql-documents' if args.template=='document-app' else 'sql-inventory'
+    flow_id='login-search-download' if args.template=='document-app' else 'inventory-export'
     sentinel = 'crl-sentinel-' + uuid.uuid4().hex
     docker('volume', 'create', '--label', 'io.compose-recovery-lab.test=' + sentinel, sentinel)
     sentinel_before = docker('volume', 'inspect', sentinel)
 
     def invoke(case, command, *extra, success=True, env=ENV):
         before = set(work.glob('*/report.json'))
-        proc = subprocess.run([str(BIN), command, '--work', str(work), *map(str, extra)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
+        proc = subprocess.run([str(BIN), command, '--work', str(work), '--images',str(images),'--template',args.template+'-v1',*map(str, extra)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
         reports = set(work.glob('*/report.json')) - before
         expect(len(reports) == 1, f'{case}: expected one report: {proc.stderr}')
         report_path = reports.pop()
@@ -78,7 +87,7 @@ def main():
 
     def interrupt(case, sig):
         before = set(work.iterdir())
-        proc = subprocess.Popen([str(BIN), 'run', '--work', str(work), '--bundle', str(output / 'complete')], cwd=ROOT, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        proc = subprocess.Popen([str(BIN), 'run', '--work', str(work),'--images',str(images), '--bundle', str(output / 'complete')], cwd=ROOT, env=ENV, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
         run_dir = None
         deadline = time.monotonic() + 40
         try:
@@ -129,7 +138,7 @@ def main():
         clean(report)
         report, _ = invoke('missing-attachment', 'run', '--bundle', output / 'missing', success=False)
         results = {check['id']: check['status'] for check in report['checks']}
-        expect(results['sql-documents'] == 'passed' and results['database-files'] == 'failed' and results['login-search-download'] == 'failed', 'missing attachment not detected across storage and HTTP')
+        expect(results[sql_id] == 'passed' and results['database-files'] == 'failed' and results[flow_id] == 'failed', 'missing attachment not detected across storage and HTTP')
         clean(report)
 
         corrupt = variant('corrupt')
@@ -197,6 +206,17 @@ def main():
         executable.chmod(0o700)
         report, report_path = invoke('cleanup-failure', 'run', '--bundle', output / 'complete', success=False, env=dict(ENV, PATH=str(shim) + ':' + os.environ['PATH']))
         expect(report['verification_result'] == 'passed' and report['cleanup_result'] == 'failed', 'cleanup failure was hidden')
+        # Inspect actual Docker objects while the injected removal failure keeps them alive.
+        for resource in report['remaining_resources']:
+            inspected=json.loads(docker(resource['kind'],'inspect',resource['id']))[0]
+            if resource['kind']=='network':expect(inspected['Internal'],'network is not internal')
+            if resource['kind']=='container':
+                host=inspected['HostConfig'];expect(not host['Privileged'] and host['NetworkMode']!='host' and not host.get('PortBindings') and not host.get('Devices'),'unsafe runtime access')
+                is_app=inspected['Config']['Labels'].get('com.docker.compose.service')=='app'
+                expect(host['Memory']==(768 if is_app else 512)*1024*1024 and host['NanoCpus']==1000000000 and host['PidsLimit']==(256 if is_app else 128),'resource limits absent')
+                if is_app:expect(host['Init'],'browser init process missing')
+                expect(all(m['Type'] in ('volume','tmpfs') for m in inspected['Mounts']),'unexpected host mount')
+                if inspected['Config']['Labels'].get('com.docker.compose.service')=='app':expect(host['ReadonlyRootfs'] and 'ALL' in host['CapDrop'],'app isolation missing')
         compose = json.loads((report_path.parent / 'compose.json').read_text())
         password = compose['services']['app']['environment']['DEMO_PASSWORD']
         for artifact in ('report.json', 'report.html', 'resources.json'):

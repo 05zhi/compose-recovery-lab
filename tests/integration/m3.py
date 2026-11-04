@@ -1,8 +1,14 @@
 """Real crash recovery at every main phase, plus fresh-attempt retry."""
+import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
+# Serialize acceptance suites; each CLI still enforces its independent account lock.
+import fcntl
+_suite_lock = open(Path.home() / '.crl-acceptance.lock', 'a')
+fcntl.flock(_suite_lock, fcntl.LOCK_EX)
+
 import shutil
 import signal
 import sqlite3
@@ -22,11 +28,12 @@ def call(*args):
 
 
 def main():
-    BASE.mkdir(mode=0o700, exist_ok=False)
-    original = Path('/tmp/crl-m2-acceptance-final')
-    shutil.copytree(original / 'bundle', BASE / 'bundle')
+    global BASE
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--fixture',type=Path,required=True);a=p.parse_args();BASE=a.output.resolve();BASE.mkdir(mode=0o700,exist_ok=False);original=a.fixture.resolve()
     cfg = json.loads((original / 'drill.yaml').read_text())
-    cfg['runtime']['images_file'] = str(ROOT / 'examples/document-app/images.lock.json')
+    original_bundle=(original/cfg['backup']['path']).resolve()
+    shutil.copytree(original_bundle, BASE/'bundle')
+    cfg['runtime']['images_file'] = str((original / cfg['runtime']['images_file']).resolve())
     cfg['runtime']['work_dir'] = str(BASE / 'work')
     cfg['runtime']['timeout'] = '2m'
     cfg['backup']['path'] = str(BASE / 'bundle')
@@ -72,7 +79,7 @@ def main():
     # Restore the original bundle content. Configuration stays identical; new manifest
     # is validated on explicit retry, and the old attempt is never overwritten.
     for name in ('database.dump', 'manifest.json'):
-        shutil.copyfile(original / 'bundle' / name, BASE / 'bundle' / name)
+        shutil.copyfile(original_bundle / name, BASE / 'bundle' / name)
     previous = results[-1]['attempt']
     call('retry', '--run', previous, '--config', config)
     latest = json.loads(call('status', '--run', previous))

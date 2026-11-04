@@ -5,6 +5,11 @@ import hashlib
 import json
 import os
 from pathlib import Path
+# Serialize acceptance suites; each CLI still enforces its independent account lock.
+import fcntl
+_suite_lock = open(Path.home() / '.crl-acceptance.lock', 'a')
+fcntl.flock(_suite_lock, fcntl.LOCK_EX)
+
 import shutil
 import subprocess
 import tempfile
