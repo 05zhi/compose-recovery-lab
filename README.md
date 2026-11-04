@@ -6,7 +6,7 @@ Docker Compose 應用的自動還原演練專案。
 
 ## 目前狀態
 
-**規劃階段，尚無可執行產品。** 文件中的命令與功能均為設計規格，不代表已實作。
+**M1 實作中。** 已加入文件網站 API fixture、合成資料初始化、Compose 設定與 HTTP/檔案單元測試；尚無完整還原 CLI，Docker/PostgreSQL 整合尚未驗收。使用方式見 [文件網站](examples/document-app/README.md)。
 
 - [詳細計畫書（繁體中文）](docs/OPERATIONS.zh-TW.md)
 - [開發與 commit 規範](AGENTS.md)

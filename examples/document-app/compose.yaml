@@ -1,0 +1,38 @@
+# Development fixture only. Digest locking and runner ownership checks follow in M1.
+services:
+  db:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_DB: documents
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?set a disposable alphanumeric password}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U demo -d documents"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+    cpus: 1
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://demo:${DEMO_DB_PASSWORD:?set a disposable alphanumeric password}@db/documents
+      DEMO_PASSWORD: ${DEMO_PASSWORD:?set a disposable login password}
+    volumes:
+      - uploads:/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 1
+networks:
+  default:
+    internal: true
+volumes:
+  database:
+  uploads:
