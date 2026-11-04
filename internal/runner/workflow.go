@@ -483,6 +483,7 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 			if err != nil {
 				return err
 			}
+			_ = docker(ctx, nil, io.Discard, "cp", app+":/tmp/evidence/browser.webm", filepath.Join(s.Dir, "browser.webm"))
 			if err = json.Unmarshal([]byte(raw), &r.Checks); err != nil {
 				return errors.New("invalid probe evidence")
 			}

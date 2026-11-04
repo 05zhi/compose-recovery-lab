@@ -44,7 +44,9 @@ def run():
 
     def downloads():
         smoke(quiet=True)
-        return 'login, search, all 10 HTTP downloads and hashes'
+        from browser_smoke import browser_smoke
+        browser_smoke()
+        return 'login, search, all 10 HTTP downloads and hashes; Chromium UI login/search/download and content hash'
 
     def egress():
         try:
