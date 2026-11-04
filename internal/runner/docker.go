@@ -145,7 +145,7 @@ func (s *Session) prepare(ctx context.Context) error {
 	db["volumes"] = []string{"database:/var/lib/postgresql/data"}
 	db["healthcheck"] = map[string]any{"test": []string{"CMD", "pg_isready", "-U", "bootstrap", "-d", "postgres"}, "interval": "1s", "timeout": "3s", "retries": 60}
 	app := common(s.Images.App)
-	app["environment"] = map[string]string{"DATABASE_URL": "postgresql://demo:" + s.password + "@db/documents", "DEMO_PASSWORD": s.password}
+	app["environment"] = map[string]string{"DATABASE_URL": "postgresql://demo:" + s.password + "@db/documents", "DEMO_PASSWORD": s.password, "CHECK_DATABASE_URL": "postgresql://crl_check:" + s.password + "@db/documents"}
 	app["volumes"] = []string{"uploads:/uploads"}
 	app["read_only"] = true
 	app["cap_drop"] = []string{"ALL"}

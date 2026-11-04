@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/05zhi/compose-recovery-lab/internal/checks"
 	"github.com/05zhi/compose-recovery-lab/internal/safeio"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"go.yaml.in/yaml/v3"
@@ -38,10 +39,7 @@ type Config struct {
 		WorkDir    string `json:"work_dir"`
 		Timeout    string `json:"timeout"`
 	} `json:"runtime"`
-	Checks []struct {
-		ID       string `json:"id"`
-		Required bool   `json:"required"`
-	} `json:"checks"`
+	Checks []checks.Spec `json:"checks"`
 	Report struct {
 		Formats []string `json:"formats"`
 	} `json:"report"`
@@ -106,6 +104,20 @@ func Parse(data []byte, base string) (Config, error) {
 	}
 	if err = json.Unmarshal(encoded, &c); err != nil {
 		return c, errors.New("invalid configuration types")
+	}
+	if err = checks.Validate(c.Checks); err != nil {
+		return c, err
+	}
+	for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
+		found := false
+		for _, check := range c.Checks {
+			if check.ID == id && check.Type == "" && check.Required {
+				found = true
+			}
+		}
+		if !found {
+			return c, errors.New("required template check missing")
+		}
 	}
 	timeout, err := time.ParseDuration(c.Runtime.Timeout)
 	if err != nil || timeout < time.Second || timeout > time.Hour {

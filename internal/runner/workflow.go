@@ -2,10 +2,12 @@ package runner
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/05zhi/compose-recovery-lab/internal/checks"
 	"html/template"
 	"io"
 	"os"
@@ -19,10 +21,11 @@ import (
 )
 
 type Check struct {
-	ID       string `json:"id"`
-	Required bool   `json:"required"`
-	Status   string `json:"status"`
-	Evidence string `json:"evidence"`
+	ID       string         `json:"id"`
+	Required bool           `json:"required"`
+	Status   string         `json:"status"`
+	Evidence string         `json:"evidence"`
+	Coverage map[string]any `json:"coverage,omitempty"`
 }
 type Step struct {
 	Name    string    `json:"name"`
@@ -154,7 +157,7 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 	r.Phase = "queued"
 	if operation == "run" {
 		for _, id := range []string{"sql-documents", "database-files", "login-search-download", "external-connectivity"} {
-			r.Checks = append(r.Checks, Check{id, true, "skipped", "verification phase not reached"})
+			r.Checks = append(r.Checks, Check{ID: id, Required: true, Status: "skipped", Evidence: "verification phase not reached"})
 		}
 	}
 	// Establish a durable initial report for manual cleanup after an uncatchable crash.
@@ -436,6 +439,9 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 			if err != nil {
 				return err
 			}
+			if err = s.checkRole(ctx, db); err != nil {
+				return err
+			}
 			if err = s.compose(ctx, "create", "app"); err != nil {
 				return err
 			}
@@ -479,6 +485,31 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 			}
 			if err = json.Unmarshal([]byte(raw), &r.Checks); err != nil {
 				return errors.New("invalid probe evidence")
+			}
+			if specs, ok := ctx.Value(checkKey{}).([]checks.Spec); ok {
+				extra := []checks.Spec{}
+				for _, c := range specs {
+					if c.Type != "" {
+						extra = append(extra, c)
+					}
+				}
+				if len(extra) > 0 {
+					data, _ := json.Marshal(extra)
+					var output bytes.Buffer
+					if err = docker(ctx, bytes.NewReader(data), &limitWriter{&output, 1 << 20}, "exec", "-i", app, "python", "-c", checks.Program); err != nil {
+						return err
+					}
+					var result []Check
+					if err = json.Unmarshal(output.Bytes(), &result); err != nil {
+						return errors.New("invalid checker output")
+					}
+					r.Checks = append(r.Checks, result...)
+				}
+				if result, problem := Aggregate(specs, r.Checks); problem != nil {
+					r.Verification = result
+					return problem
+				}
+				return nil
 			}
 			if err = validateChecks(r.Checks); err != nil {
 				r.Verification = "failed"

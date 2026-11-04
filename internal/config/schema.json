@@ -2,52 +2,342 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://compose-recovery-lab.invalid/drill-v1.json",
   "title": "Compose Recovery Lab drill v1 (document-app-v1)",
-  "type": "object", "additionalProperties": false,
-  "required": ["schema_version", "name", "template", "backup", "runtime", "checks", "report"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name",
+    "template",
+    "backup",
+    "runtime",
+    "checks",
+    "report"
+  ],
   "properties": {
-    "schema_version": {"const": 1},
-    "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,62}$"},
-    "template": {"const": "document-app-v1"},
+    "schema_version": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "template": {
+      "const": "document-app-v1"
+    },
     "backup": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "path", "mapping"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "path",
+        "mapping"
+      ],
       "properties": {
-        "type": {"const": "local_bundle"},
-        "path": {"$ref": "#/$defs/path"},
+        "type": {
+          "const": "local_bundle"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
         "mapping": {
-          "type": "object", "additionalProperties": false,
-          "required": ["database", "uploads", "app_config"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "database",
+            "uploads",
+            "app_config"
+          ],
           "properties": {
-            "database": {"const": "database.dump"},
-            "uploads": {"const": "uploads.tar"},
-            "app_config": {"const": "app-config.sanitized.json"}
+            "database": {
+              "const": "database.dump"
+            },
+            "uploads": {
+              "const": "uploads.tar"
+            },
+            "app_config": {
+              "const": "app-config.sanitized.json"
+            }
           }
         }
       }
     },
     "runtime": {
-      "type": "object", "additionalProperties": false,
-      "required": ["images_file", "work_dir", "timeout"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "images_file",
+        "work_dir",
+        "timeout"
+      ],
       "properties": {
-        "images_file": {"$ref": "#/$defs/path"},
-        "work_dir": {"$ref": "#/$defs/path"},
-        "timeout": {"type": "string", "pattern": "^[1-9][0-9]*(s|m|h)$"}
-      }
-    },
-    "checks": {
-      "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true,
-      "items": {
-        "type": "object", "additionalProperties": false, "required": ["id", "required"],
-        "properties": {
-          "id": {"enum": ["sql-documents", "database-files", "login-search-download", "external-connectivity"]},
-          "required": {"const": true}
+        "images_file": {
+          "$ref": "#/$defs/path"
+        },
+        "work_dir": {
+          "$ref": "#/$defs/path"
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(s|m|h)$"
         }
       }
     },
+    "checks": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "required"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "sql-documents",
+                  "database-files",
+                  "login-search-download",
+                  "external-connectivity"
+                ]
+              },
+              "required": {
+                "const": true
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "required",
+              "type",
+              "query",
+              "expect"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "sql"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "expect": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operator",
+                  "value"
+                ],
+                "properties": {
+                  "operator": {
+                    "enum": [
+                      "eq",
+                      "ne",
+                      "gte",
+                      "lte"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "boolean",
+                      "string"
+                    ],
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "required",
+              "type",
+              "path",
+              "sha256",
+              "root"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "file"
+              },
+              "path": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "root": {
+                "const": "uploads"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "required",
+              "type",
+              "query",
+              "root",
+              "scope"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "database_files"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "root": {
+                "const": "uploads"
+              },
+              "scope": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "properties": {
+                      "mode": {
+                        "const": "all"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "size",
+                      "seed"
+                    ],
+                    "properties": {
+                      "mode": {
+                        "const": "sample"
+                      },
+                      "size": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "seed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "required",
+              "type",
+              "path",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "http"
+              },
+              "path": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "contains": {
+                "type": "string",
+                "maxLength": 256
+              }
+            }
+          }
+        ]
+      }
+    },
     "report": {
-      "type": "object", "additionalProperties": false, "required": ["formats"],
-      "properties": {"formats": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["json", "html"]}}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formats"
+      ],
+      "properties": {
+        "formats": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "json",
+              "html"
+            ]
+          }
+        }
+      }
     }
   },
-  "$defs": {"path": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^$~\u0000-\u001f]+$"}}
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^$~\u0000-\u001f]+$"
+    }
+  }
 }
