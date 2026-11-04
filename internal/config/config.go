@@ -11,12 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/05zhi/compose-recovery-lab/internal/safeio"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"go.yaml.in/yaml/v3"
 )
@@ -50,18 +50,9 @@ type Config struct {
 
 func Load(filename string) (Config, error) {
 	var zero Config
-	f, err := os.Open(filename)
+	data, err := safeio.Read(filename, 65536)
 	if err != nil {
-		return zero, errors.New("cannot open configuration")
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil || !info.Mode().IsRegular() {
-		return zero, errors.New("configuration must be a regular file")
-	}
-	data, err := io.ReadAll(io.LimitReader(f, 65537))
-	if err != nil {
-		return zero, errors.New("cannot read configuration")
+		return zero, errors.New("configuration must be a readable, bounded regular file")
 	}
 	return Parse(data, filepath.Dir(filename))
 }

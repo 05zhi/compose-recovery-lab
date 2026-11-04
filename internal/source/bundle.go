@@ -14,6 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/05zhi/compose-recovery-lab/internal/safeio"
+	"github.com/05zhi/compose-recovery-lab/internal/strictjson"
 )
 
 const MaxFileSize int64 = 256 << 20
@@ -44,7 +47,7 @@ type Manifest struct {
 }
 
 func Digest(name string) (File, error) {
-	f, err := os.Open(name)
+	f, before, err := safeio.Open(name, MaxFileSize)
 	if err != nil {
 		return File{}, err
 	}
@@ -57,10 +60,16 @@ func Digest(name string) (File, error) {
 	if n > MaxFileSize {
 		return File{}, errors.New("bundle file too large")
 	}
+	if err = safeio.Verify(name, before); err != nil {
+		return File{}, err
+	}
 	return File{n, hex.EncodeToString(h.Sum(nil))}, nil
 }
 
 func WriteManifest(dir string, m Manifest) error {
+	if m.Limitations == nil {
+		m.Limitations = []string{}
+	}
 	m.Files = map[string]File{}
 	for _, name := range Names {
 		f, err := Digest(filepath.Join(dir, name))
@@ -81,20 +90,33 @@ func Load(dir string) (Manifest, error) {
 	if strings.HasSuffix(filepath.Clean(dir), ".partial") {
 		return m, errors.New("unpublished partial bundle")
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	info, err := os.Lstat(dir)
+	if err != nil || !info.IsDir() {
+		return m, errors.New("bundle root must be a directory, not a link")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 4 {
+		return m, errors.New("bundle must contain exactly the four contract files")
+	}
+	snapshots := map[string]os.FileInfo{}
+	for _, name := range append([]string{"manifest.json"}, Names...) {
+		limit := MaxFileSize
+		if name == "manifest.json" {
+			limit = 65536
+		}
+		f, before, err := safeio.Open(filepath.Join(dir, name), limit)
+		if err != nil {
+			return m, err
+		}
+		f.Close()
+		snapshots[name] = before
+	}
+	data, err := safeio.Read(filepath.Join(dir, "manifest.json"), 65536)
 	if err != nil {
 		return m, err
 	}
-	if len(data) > 65536 {
-		return m, errors.New("manifest too large")
-	}
-	dec := json.NewDecoder(strings.NewReader(string(data)))
-	dec.DisallowUnknownFields()
-	if err = dec.Decode(&m); err != nil {
+	if err = strictjson.Decode(data, &m); err != nil {
 		return m, err
-	}
-	if dec.Decode(new(any)) != io.EOF {
-		return m, errors.New("trailing manifest content")
 	}
 	if m.SchemaVersion != 1 || m.PostgresMajor != 17 || m.AppVersion != "document-app-v1" || m.BackupID == "" {
 		return m, errors.New("unsupported backup contract")
@@ -102,7 +124,7 @@ func Load(dir string) (Manifest, error) {
 	if len(m.Extensions) != 1 || m.Extensions[0] != "plpgsql" {
 		return m, errors.New("unsupported extensions")
 	}
-	if m.StartedAt.IsZero() || m.FinishedAt.Before(m.StartedAt) || m.Consistency == "" {
+	if m.StartedAt.IsZero() || m.FinishedAt.IsZero() || m.FinishedAt.Before(m.StartedAt) || strings.TrimSpace(m.Consistency) == "" {
 		return m, errors.New("invalid consistency metadata")
 	}
 	if m.AttachmentCount < 0 || m.AttachmentCount > MaxFiles || len(m.Files) != len(Names) {
@@ -113,8 +135,8 @@ func Load(dir string) (Manifest, error) {
 	}
 	for _, name := range Names {
 		want, ok := m.Files[name]
-		if !ok {
-			return m, errors.New("missing file metadata")
+		if !ok || want.Size < 0 || want.Size > MaxFileSize || len(want.SHA256) != 64 {
+			return m, errors.New("missing or invalid file metadata")
 		}
 		got, err := Digest(filepath.Join(dir, name))
 		if err != nil {
@@ -124,7 +146,7 @@ func Load(dir string) (Manifest, error) {
 			return m, fmt.Errorf("integrity mismatch: %s", name)
 		}
 	}
-	dump, err := os.Open(filepath.Join(dir, "database.dump"))
+	dump, _, err := safeio.Open(filepath.Join(dir, "database.dump"), MaxFileSize)
 	if err != nil {
 		return m, err
 	}
@@ -140,6 +162,11 @@ func Load(dir string) (Manifest, error) {
 	}
 	if count != m.AttachmentCount {
 		return m, errors.New("attachment inventory mismatch")
+	}
+	for name, before := range snapshots {
+		if err = safeio.Verify(filepath.Join(dir, name), before); err != nil {
+			return m, err
+		}
 	}
 	return m, nil
 }
@@ -178,7 +205,7 @@ func Stage(src, dst string) (Manifest, error) {
 		if name == "manifest.json" && before.Size() > 65536 {
 			return zero, errors.New("manifest too large")
 		}
-		in, err := os.Open(from)
+		in, _, err := safeio.Open(from, MaxFileSize)
 		if err != nil {
 			return zero, err
 		}
@@ -214,16 +241,21 @@ func SafeName(name string) bool {
 }
 
 // ValidateTar rejects all links, special files, duplicates, traversal and expansion bombs.
-func ValidateTar(filename string) (int, error) {
-	f, err := os.Open(filename)
+func ValidateTar(filename string) (count int, err error) {
+	f, before, err := safeio.Open(filename, MaxFileSize)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
+	defer func() {
+		if err == nil {
+			err = safeio.Verify(filename, before)
+		}
+	}()
 	tr := tar.NewReader(f)
 	seen := map[string]bool{}
 	var total int64
-	count := 0
+	count = 0
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -246,10 +278,10 @@ func ValidateTar(filename string) (int, error) {
 		if h.Mode&07000 != 0 || h.Size < 0 {
 			return 0, errors.New("unsafe tar metadata")
 		}
-		total += h.Size
-		if total > MaxUploadsSize {
+		if h.Size > MaxUploadsSize-total {
 			return 0, errors.New("tar expansion limit exceeded")
 		}
+		total += h.Size
 		if h.Typeflag == tar.TypeReg {
 			count++
 		}
