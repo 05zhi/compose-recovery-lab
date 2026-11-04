@@ -1,4 +1,5 @@
 """M2 acceptance: offline purity, negative contracts and real configured recovery."""
+import argparse
 import copy
 import hashlib
 import json
@@ -13,7 +14,16 @@ BIN = ROOT / 'bin/crl'
 
 
 def main():
-    root = Path(tempfile.mkdtemp(prefix='crl-m2-acceptance-'))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', type=Path, help='new persistent evidence directory')
+    args = parser.parse_args()
+    if args.output:
+        root = args.output.resolve()
+        root.mkdir(mode=0o700, parents=True, exist_ok=False)
+    else:
+        parent = Path.home() / '.local/state/compose-recovery-lab/acceptance'
+        parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        root = Path(tempfile.mkdtemp(prefix='m2-', dir=parent))
     work = root / 'work'
     bundle = root / 'bundle'
     summary = []
