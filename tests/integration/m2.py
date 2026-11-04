@@ -119,6 +119,27 @@ def main():
     assert data['config_hash'] == plan['config_hash']
     assert data['backup_id'] == plan['backup_id'] and not data['remaining_resources']
     assert resources() == before, 'configured run leaked resources'
+
+    # Change a still-valid manifest after in-process planning, during read-only doctor.
+    # The runner must refuse the changed snapshot before starting restoration.
+    tamper = root / 'tamper-docker'
+    tamper.mkdir()
+    changed = root / 'manifest-changed'
+    executable = tamper / 'docker'
+    executable.write_text('#!/usr/bin/python3\nimport os,sys,json\nfrom pathlib import Path\n'
+                          f'marker=Path({str(changed)!r})\nmanifest=Path({str(bundle / "manifest.json")!r})\n'
+                          'if sys.argv[1:3]==["image","inspect"] and not marker.exists():\n'
+                          ' data=json.loads(manifest.read_text()); data["backup_id"]="changed-after-plan"; manifest.write_text(json.dumps(data)); marker.touch()\n'
+                          'os.execv("/usr/bin/docker", ["docker", *sys.argv[1:]])\n')
+    executable.chmod(0o700)
+    refused = invoke('manifest-changed-after-plan', ['run', '--config', cfg], expected=1,
+                     custom_env=dict(env, PATH=str(tamper) + ':' + os.environ['PATH']))
+    refused_report = json.loads(Path(refused.stdout.strip().removeprefix('report: ')).read_text())
+    assert changed.exists() and refused_report['verification_result'] == 'failed'
+    assert refused_report['cleanup_result'] == 'complete' and not refused_report['remaining_resources']
+    assert all(step['name'] != 'restoring' for step in refused_report['steps'])
+    (bundle / 'manifest.json').write_bytes(original_manifest)
+    assert resources() == before, 'snapshot rejection leaked resources'
     invoke('repeat-plan', ['plan', '--config', cfg])
     (root / 'summary.json').write_text(json.dumps(summary, indent=2))
     print('M2 acceptance passed; evidence:', root, flush=True)

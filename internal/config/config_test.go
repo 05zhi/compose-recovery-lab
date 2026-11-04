@@ -75,3 +75,8 @@ func TestRejectInvalid(t *testing.T) {
 		})
 	}
 }
+func TestPublishedExample(t *testing.T) {
+	if _, err := Load("../../examples/document-app/drill.yaml"); err != nil {
+		t.Fatal(err)
+	}
+}
