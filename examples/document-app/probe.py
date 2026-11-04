@@ -1,4 +1,5 @@
 """Bounded checks for the synthetic M1 contract; stdout contains no credentials."""
+from probe_diagnostics import failure_evidence
 import hashlib
 import json
 from pathlib import Path
@@ -15,8 +16,8 @@ def run():
         try:
             evidence = fn()
             results.append({'id': name, 'required': True, 'status': 'passed', 'evidence': evidence})
-        except Exception:
-            results.append({'id': name, 'required': True, 'status': 'failed', 'evidence': 'assertion or operation failed; synthetic fixture only'})
+        except Exception as error:
+            results.append({'id': name, 'required': True, 'status': 'failed', 'evidence': failure_evidence(error)})
 
     def sql():
         with Store().connect() as db:

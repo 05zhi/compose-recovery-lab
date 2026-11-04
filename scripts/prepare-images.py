@@ -11,7 +11,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='crl-build-') as temp:
             context=Path(temp)/'context';context.mkdir();iid=Path(temp)/'image-id'
             files=['Dockerfile','app.py','smoke.py','probe.py','browser_smoke.py','ui.html']
-            if name=='document-app':files+=['requirements.txt']
+            if name=='document-app':files+=['requirements.txt','probe_diagnostics.py']
             dest=context if name=='document-app' else context/'examples/inventory-app';dest.mkdir(parents=True,exist_ok=True)
             for f in files:shutil.copy2(ROOT/'examples'/name/f,dest/f)
             command=['docker','build','--iidfile',str(iid)]

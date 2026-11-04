@@ -1,3 +1,4 @@
+from probe_diagnostics import failure_evidence
 import hashlib,json,socket
 from pathlib import Path
 from app import Store,attachment
@@ -6,7 +7,7 @@ def run():
     results=[]
     def check(name,fn,coverage):
         try:fn();results.append(dict(id=name,required=True,status='passed',evidence='inventory assertion passed',coverage=coverage))
-        except Exception:results.append(dict(id=name,required=True,status='failed',evidence='inventory assertion or operation failed'))
+        except Exception as error:results.append(dict(id=name,required=True,status='failed',evidence=failure_evidence(error)))
     def sql():
         with Store().connect() as db:
             db.execute('SET TRANSACTION READ ONLY');db.execute("SET LOCAL statement_timeout='5s'")
