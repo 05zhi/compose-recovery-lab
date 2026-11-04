@@ -2,6 +2,8 @@
 
 這是合成資料用的唯讀 HTTP API，含 PostgreSQL 帳號與文件資料表、10 份附件、登入、搜尋及下載。僅供專用測試環境，不是正式服務。控制程式為 Go；此 Python 程式是被備份與恢復的應用。
 
+版本化設定見 [drill.yaml](drill.yaml) 與 [M2 手冊](../../docs/M2_RUNBOOK.zh-TW.md)。
+
 完整備份、還原、報告與清理指令見 [M1 操作手冊](../../docs/M1_RUNBOOK.zh-TW.md)。建議使用 Go CLI 建立獨立環境；本目錄的 `compose.yaml` 僅保留為手動開發範例，不是 CLI 的設定輸入。CLI 使用自己的固定模板與所有權標籤。
 
 ```sh

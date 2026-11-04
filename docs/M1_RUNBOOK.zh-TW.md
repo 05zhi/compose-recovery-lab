@@ -1,6 +1,6 @@
 # M1：文件網站備份與恢復演練
 
-M1 僅支援自製 `document-app-v1`、PostgreSQL 17 custom-format dump，以及本工具製作的本機備份包。CLI 由允許清單產生 Compose 設定，不接受任意 Compose/YAML、正式備份或任意外部命令。M2 的 `doctor/plan --config` 尚未實作。
+M1 僅支援自製 `document-app-v1`、PostgreSQL 17 custom-format dump，以及本工具製作的本機備份包。CLI 由允許清單產生 Compose 設定，不接受任意 Compose/YAML、正式備份或任意外部命令。設定驅動介面 `doctor/plan/run --config` 已於 M2 完成，見 [M2 手冊](M2_RUNBOOK.zh-TW.md)；本頁保留 M1 舊介面說明。
 
 ## 執行環境
 
@@ -79,4 +79,4 @@ M1 的固定上限：單一備份檔 256 MiB、tar 展開總量 64 MiB、最多 
 
 每個服務有 CPU、記憶體、PID 上限；工作目錄至少保留 1 GiB 可用空間並每秒檢查。此為磁碟預檢與取消策略，不是 quota；Docker 儲存若位於另一個檔案系統，需另行監控。沒有主機 port、host bind mount、外部 volume/network。容器仍共享核心，不是惡意程式沙箱。
 
-M2–M6 尚未完成：通用 YAML schema／doctor／plan、SQLite 狀態與歷史、完整各階段崩潰矩陣、自動重試、第二應用模板、通用 checker、Playwright、通知與跨主機部署。M1 不等於整個 P0 產品完成。
+M3–M6 尚未完成：SQLite 狀態與歷史、完整各階段崩潰矩陣、自動重試、第二應用模板、通用 checker、Playwright、通知與跨主機部署。M1 不等於整個 P0 產品完成。
