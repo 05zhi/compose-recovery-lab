@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -42,7 +43,13 @@ func probe(ctx context.Context, out any, args ...string) error {
 	}
 	return json.Unmarshal(data, out)
 }
+
+type queryFunc func(context.Context, any, ...string) error
+
 func CheckPlan(ctx context.Context, p planner.Plan, offline bool) Report {
+	return checkPlan(ctx, p, offline, probe)
+}
+func checkPlan(ctx context.Context, p planner.Plan, offline bool, query queryFunc) Report {
 	r := Report{Status: "ready", Ready: true, ConfigHash: p.ConfigHash, BackupID: p.BackupID, Checks: []Check{{"config-manifest-mapping", "passed", "schema, hashes, archive bounds, mappings and image lock agree"}}}
 	add := func(id string, ok bool, detail string) {
 		status := "passed"
@@ -72,6 +79,12 @@ func CheckPlan(ctx context.Context, p planner.Plan, offline bool) Report {
 		}
 		existing = parent
 	}
+	infoPath, pathErr := os.Stat(existing)
+	accessOK := pathErr == nil && infoPath.IsDir() && syscall.Access(existing, 3) == nil
+	if existing == p.WorkDir && pathErr == nil && infoPath.Mode().Perm()&0077 != 0 {
+		accessOK = false
+	}
+	add("workspace-access", accessOK, "workspace must be a writable private directory, or creatable below an accessible parent")
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(existing, &stat)
 	add("workspace-space", err == nil && stat.Bavail*uint64(stat.Bsize) >= 1<<30, "at least 1 GiB free on workspace filesystem; no directory created")
@@ -81,13 +94,13 @@ func CheckPlan(ctx context.Context, p planner.Plan, offline bool) Report {
 		Os         string
 		Arch       string
 	}
-	err = probe(ctx, &server, "version", "--format", "{{json .Server}}")
-	add("docker-engine", err == nil && server.Os == "linux" && server.Arch == "amd64", "local Linux/amd64 Docker engine required")
+	err = query(ctx, &server, "version", "--format", "{{json .Server}}")
+	add("docker-engine", err == nil && server.Os == "linux" && server.Arch == "amd64" && supportedAPI(server.APIVersion), "local Linux/amd64 Docker engine required")
 	if err == nil {
-		r.Checks[len(r.Checks)-1].Detail = "Docker " + server.Version + "; API " + server.APIVersion
+		r.Checks[len(r.Checks)-1].Detail = "Docker " + server.Version + "; API " + server.APIVersion + "; requires Linux/amd64 API >=1.44"
 	}
 	var compose struct{ Version string }
-	err = probe(ctx, &compose, "compose", "version", "--format", "json")
+	err = query(ctx, &compose, "compose", "version", "--format", "json")
 	add("compose-v2", err == nil && strings.HasPrefix(strings.TrimPrefix(compose.Version, "v"), "2."), "Compose v2 required")
 	if err == nil {
 		r.Checks[len(r.Checks)-1].Detail = compose.Version
@@ -97,19 +110,29 @@ func CheckPlan(ctx context.Context, p planner.Plan, offline bool) Report {
 		MemTotal      int64
 		DockerRootDir string
 	}
-	err = probe(ctx, &info, "info", "--format", "{{json .}}")
+	err = query(ctx, &info, "info", "--format", "{{json .}}")
 	add("engine-capacity", err == nil && info.NCPU >= 2 && info.MemTotal >= 2<<30, "minimum 2 CPUs / 2 GiB engine RAM for this template")
 	diskErr := syscall.Statfs(info.DockerRootDir, &stat)
 	add("docker-storage", err == nil && diskErr == nil && stat.Bavail*uint64(stat.Bsize) >= 1<<30, "at least 1 GiB free on local Docker storage filesystem")
-	for role, image := range map[string]string{"postgres": p.Images.Postgres, "app": p.Images.App} {
+	for _, pair := range [][2]string{{"postgres", p.Images.Postgres}, {"app", p.Images.App}} {
+		role, image := pair[0], pair[1]
 		var entries []struct {
 			ID   string `json:"Id"`
 			OS   string `json:"Os"`
 			Arch string `json:"Architecture"`
 		}
-		err = probe(ctx, &entries, "image", "inspect", image)
+		err = query(ctx, &entries, "image", "inspect", image)
 		ok := err == nil && len(entries) == 1 && entries[0].OS == "linux" && entries[0].Arch == "amd64"
 		add("image-"+role, ok, "immutable image must already exist locally as linux/amd64; doctor never pulls")
 	}
 	return r
+}
+
+func supportedAPI(version string) bool {
+	parts := strings.Split(version, ".")
+	if len(parts) != 2 || parts[0] != "1" {
+		return false
+	}
+	minor, err := strconv.Atoi(parts[1])
+	return err == nil && minor >= 44
 }
