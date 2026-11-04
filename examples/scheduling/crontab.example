@@ -1,0 +1,3 @@
+# Install manually for the authorized Docker operator; use absolute paths.
+# Each invocation runs configurations sequentially. The CLI also holds an account lock.
+0 3 * * 0 umask 077; /usr/bin/python3 /opt/compose-recovery-lab/scripts/scheduled.py --binary /opt/compose-recovery-lab/bin/crl /etc/crl/document.yaml /etc/crl/inventory.yaml >> /var/log/crl-schedule.jsonl 2>&1

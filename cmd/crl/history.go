@@ -6,11 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/05zhi/compose-recovery-lab/internal/config"
+	"github.com/05zhi/compose-recovery-lab/internal/doctor"
 	"github.com/05zhi/compose-recovery-lab/internal/planner"
 	"github.com/05zhi/compose-recovery-lab/internal/runner"
 	"github.com/05zhi/compose-recovery-lab/internal/state"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -85,12 +88,10 @@ func historyCommand(command string, args []string) int {
 		if *format != "html" {
 			return 2
 		}
-		data, e := os.ReadFile(filepath.Join(record.Dir, "report.html"))
-		if e != nil {
+		if e := runner.RenderStored(os.Stdout, record.Report); e != nil {
 			fmt.Fprintln(os.Stderr, e)
 			return 1
 		}
-		fmt.Print(string(data))
 		return 0
 	case "retry":
 		c, e := config.Load(*configPath)
@@ -114,10 +115,16 @@ func historyCommand(command string, args []string) int {
 		}
 		defer lock.Close()
 		duration, _ := time.ParseDuration(c.Runtime.Timeout)
-		ctx, cancel := context.WithTimeout(context.Background(), duration)
+		signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		ctx, cancel := context.WithTimeout(signalCtx, duration)
 		defer cancel()
 		if e = runner.Reconcile(ctx); e != nil {
 			fmt.Fprintln(os.Stderr, e)
+			return 1
+		}
+		if !doctor.CheckPlan(ctx, p, false).Ready {
+			fmt.Fprintln(os.Stderr, "retry environment not ready")
 			return 1
 		}
 		dir, e := runner.RunConfigured(runner.CheckContext(runner.RetryContext(ctx, record.ID), c.Checks), p.WorkDir, c.Backup.Path, p.Images, p.ConfigHash, p.ManifestHash)

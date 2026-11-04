@@ -1,0 +1,17 @@
+[Unit]
+Description=Compose Recovery Lab sequential drills
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=crl
+UMask=0077
+WorkingDirectory=/opt/compose-recovery-lab
+ExecStart=/usr/bin/python3 /opt/compose-recovery-lab/scripts/scheduled.py --binary /opt/compose-recovery-lab/bin/crl /etc/crl/document.yaml /etc/crl/inventory.yaml
+TimeoutStartSec=2h
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+# The crl account needs authorized Docker access, equivalent to host root.
+# Add --webhook-file /etc/crl/webhook.url only for an approved destination.

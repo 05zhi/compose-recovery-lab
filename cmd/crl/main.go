@@ -21,6 +21,9 @@ func run() int {
 		return 2
 	}
 	command := os.Args[1]
+	if command == "notify" {
+		return notifyCommand(os.Args[2:])
+	}
 	if command == "history" || command == "status" || command == "report" || command == "recover" || command == "retry" {
 		return historyCommand(command, os.Args[2:])
 	}

@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -28,32 +29,37 @@ type Check struct {
 	Coverage map[string]any `json:"coverage,omitempty"`
 }
 type Step struct {
-	Name    string    `json:"name"`
-	Started time.Time `json:"started_at"`
-	Seconds float64   `json:"seconds"`
-	Status  string    `json:"status"`
+	Finished time.Time `json:"finished_at"`
+	Name     string    `json:"name"`
+	Started  time.Time `json:"started_at"`
+	Seconds  float64   `json:"seconds"`
+	Status   string    `json:"status"`
 }
 type Report struct {
-	LogicalRunID string `json:"logical_run_id"`
-	AttemptID    string `json:"attempt_id"`
-	Phase        string `json:"phase"`
-	store        *state.Store
-	dir          string
-	ConfigHash   string           `json:"config_hash,omitempty"`
-	RunID        string           `json:"run_id"`
-	Operation    string           `json:"operation"`
-	Started      time.Time        `json:"started_at"`
-	Finished     time.Time        `json:"finished_at"`
-	Verification string           `json:"verification_result"`
-	Cleanup      string           `json:"cleanup_result"`
-	BackupID     string           `json:"backup_id,omitempty"`
-	Backup       *source.Manifest `json:"backup,omitempty"`
-	Images       Images           `json:"images"`
-	Steps        []Step           `json:"steps"`
-	Checks       []Check          `json:"checks"`
-	Remaining    []Resource       `json:"remaining_resources"`
-	Error        string           `json:"error,omitempty"`
-	Limitations  []string         `json:"limitations"`
+	ReportVersion int            `json:"report_version"`
+	ToolVersion   string         `json:"tool_version"`
+	Environment   map[string]any `json:"environment,omitempty"`
+	Artifacts     []string       `json:"artifacts,omitempty"`
+	LogicalRunID  string         `json:"logical_run_id"`
+	AttemptID     string         `json:"attempt_id"`
+	Phase         string         `json:"phase"`
+	store         *state.Store
+	dir           string
+	ConfigHash    string           `json:"config_hash,omitempty"`
+	RunID         string           `json:"run_id"`
+	Operation     string           `json:"operation"`
+	Started       time.Time        `json:"started_at"`
+	Finished      time.Time        `json:"finished_at"`
+	Verification  string           `json:"verification_result"`
+	Cleanup       string           `json:"cleanup_result"`
+	BackupID      string           `json:"backup_id,omitempty"`
+	Backup        *source.Manifest `json:"backup,omitempty"`
+	Images        Images           `json:"images"`
+	Steps         []Step           `json:"steps"`
+	Checks        []Check          `json:"checks"`
+	Remaining     []Resource       `json:"remaining_resources"`
+	Error         string           `json:"error,omitempty"`
+	Limitations   []string         `json:"limitations"`
 }
 
 func (r *Report) step(name string, fn func() error) error {
@@ -73,7 +79,7 @@ func (r *Report) step(name string, fn func() error) error {
 	if err != nil {
 		status = "error"
 	}
-	r.Steps = append(r.Steps, Step{name, start, time.Since(start).Seconds(), status})
+	r.Steps = append(r.Steps, Step{Name: name, Started: start, Finished: time.Now().UTC(), Seconds: time.Since(start).Seconds(), Status: status})
 	if r.store != nil {
 		err = errors.Join(err, r.store.Phase(r.RunID, name, status), r.write(r.dir))
 	}
@@ -93,12 +99,22 @@ func (r *Report) write(dir string) error {
 	if err := writeJSON(filepath.Join(dir, "report.json"), r); err != nil {
 		return err
 	}
-	t := template.Must(template.New("report").Parse(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Compose Recovery Lab</title><style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ccc;text-align:left}code{overflow-wrap:anywhere}</style><h1>Compose Recovery Lab</h1><p>Run <code>{{.RunID}}</code></p><p>Verification: <b>{{.Verification}}</b> · Cleanup: <b>{{.Cleanup}}</b></p><p>{{.Error}}</p><p>Backup: <code>{{.BackupID}}</code></p><p>PostgreSQL image: <code>{{.Images.Postgres}}</code></p><p>Application image: <code>{{.Images.App}}</code></p><p>{{.Started}} — {{.Finished}}</p>{{with .Backup}}<p>Consistency: {{.Consistency}}</p><p>Backup interval: {{.StartedAt}} — {{.FinishedAt}}; attachments: {{.AttachmentCount}}</p>{{end}}<h2>Checks</h2><table>{{range .Checks}}<tr><th>{{.ID}}</th><td>{{.Status}}</td><td>{{.Evidence}}</td></tr>{{end}}</table><h2>Phases</h2><table>{{range .Steps}}<tr><th>{{.Name}}</th><td>{{.Status}}</td><td>{{printf "%.3f" .Seconds}} s</td></tr>{{end}}</table><h2>Coverage and limitations</h2><ul>{{range .Limitations}}<li>{{.}}</li>{{end}}</ul></html>`))
 	f, err := os.OpenFile(filepath.Join(dir, "report.html"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
-	return errors.Join(t.Execute(f, r), f.Close())
+	return errors.Join(RenderHTML(f, r), f.Close())
+}
+func RenderStored(w io.Writer, data []byte) error {
+	var r Report
+	if err := json.Unmarshal(data, &r); err != nil {
+		return err
+	}
+	return RenderHTML(w, &r)
+}
+func RenderHTML(w io.Writer, r *Report) error {
+	t := template.Must(template.New("report").Parse(`<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>Compose Recovery Lab</title><style>body{font:16px system-ui;max-width:960px;margin:40px auto;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ccc;text-align:left}code{overflow-wrap:anywhere}</style><h1>Compose Recovery Lab</h1><p>Run <code>{{.RunID}}</code></p><p>Verification: <b>{{.Verification}}</b> · Cleanup: <b>{{.Cleanup}}</b></p><p>{{.Error}}</p><p>Backup: <code>{{.BackupID}}</code></p><p>PostgreSQL image: <code>{{.Images.Postgres}}</code></p><p>Application image: <code>{{.Images.App}}</code></p><p>{{.Started}} — {{.Finished}}</p>{{with .Backup}}<p>Consistency: {{.Consistency}}</p><p>Backup interval: {{.StartedAt}} — {{.FinishedAt}}; attachments: {{.AttachmentCount}}</p>{{end}}<p>Logical run: <code>{{.LogicalRunID}}</code> · Attempt: <code>{{.AttemptID}}</code></p><p>Config SHA-256: <code>{{.ConfigHash}}</code></p><h2>Checks</h2><table>{{range .Checks}}<tr><th>{{.ID}}</th><td>{{.Status}}</td><td>{{.Evidence}}</td><td>{{with .Coverage}}{{.}}{{end}}</td></tr>{{end}}</table><h2>Phases</h2><table>{{range .Steps}}<tr><th>{{.Name}}</th><td>{{.Status}}</td><td>{{printf "%.3f" .Seconds}} s</td></tr>{{end}}</table><h2>Execution environment</h2><p>Tool {{.ToolVersion}} · report v{{.ReportVersion}}</p><p>{{.Environment}}</p><h2>Remaining resources</h2><ul>{{range .Remaining}}<li>{{.Kind}}: <code>{{.ID}}</code></li>{{end}}</ul><h2>Artifacts</h2><ul>{{range .Artifacts}}<li>{{.}}</li>{{end}}</ul><h2>Coverage and limitations</h2><ul>{{range .Limitations}}<li>{{.}}</li>{{end}}</ul></html>`))
+	return t.Execute(w, r)
 }
 
 // Lock serializes this Linux user's drills even when different output roots are used.
@@ -149,6 +165,17 @@ func execute(ctx context.Context, root, operation string, images Images, fn func
 		return dir, err
 	}
 	r := &Report{RunID: s.ID, Operation: operation, Started: time.Now().UTC(), Verification: "inconclusive", Cleanup: "pending", Images: images, Checks: []Check{}, Limitations: []string{"M1 synthetic document-app-v1 only; not an arbitrary Compose runner", "Required coverage: all 10 fixture attachments; see individual check status for executed coverage", "Demo account password replaced with a generated drill password; owner/ACL excluded during restore", "External connectivity check covers one TCP endpoint only; not a hostile-code sandbox", "Image download/build excluded from timing; local cached images required", "SQLite attempts retain previous evidence; retry always restores into fresh resources"}}
+	r.ReportVersion = 1
+	r.ToolVersion = "0.3.0-dev"
+	r.Environment = map[string]any{"os": runtime.GOOS, "arch": runtime.GOARCH, "cpus": runtime.NumCPU(), "go": runtime.Version()}
+	var info syscall.Sysinfo_t
+	if syscall.Sysinfo(&info) == nil {
+		r.Environment["host_memory_bytes"] = info.Totalram * uint64(info.Unit)
+	}
+	var space syscall.Statfs_t
+	if syscall.Statfs(dir, &space) == nil {
+		r.Environment["workspace_free_bytes_at_start"] = space.Bavail * uint64(space.Bsize)
+	}
 	r.ConfigHash, _ = ctx.Value(configHashKey{}).(string)
 	r.store = s.store
 	r.dir = dir
@@ -483,7 +510,12 @@ func runBundle(ctx context.Context, root, bundle string, images Images, configHa
 			if err != nil {
 				return err
 			}
-			_ = docker(ctx, nil, io.Discard, "cp", app+":/tmp/evidence/browser.webm", filepath.Join(s.Dir, "browser.webm"))
+			if videoErr := toFile(ctx, filepath.Join(s.Dir, "browser.webm"), "exec", app, "cat", "/tmp/evidence/browser.webm"); videoErr == nil {
+				r.Artifacts = append(r.Artifacts, "browser.webm")
+			} else {
+				r.Limitations = append(r.Limitations, "Browser video unavailable for this attempt")
+				_ = os.Remove(filepath.Join(s.Dir, "browser.webm"))
+			}
 			if err = json.Unmarshal([]byte(raw), &r.Checks); err != nil {
 				return errors.New("invalid probe evidence")
 			}
