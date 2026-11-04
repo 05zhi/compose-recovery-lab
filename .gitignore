@@ -35,3 +35,6 @@ node_modules/
 __pycache__/
 .DS_Store
 Thumbs.db
+
+# Machine-local immutable app image lock
+examples/document-app/images.lock.json

@@ -159,7 +159,14 @@ if __name__ == '__main__':
     root = Path(os.environ.get('UPLOADS_ROOT', '/uploads'))
     if sys.argv[1:] == ['seed']:
         seed(store, root, os.environ['DEMO_PASSWORD'])
+    elif sys.argv[1:] == ['reset-password']:
+        # Explicit drill-only substitution; never silently alter restored credentials.
+        salt = secrets.token_hex(16)
+        with store.connect() as db:
+            result = db.execute('UPDATE accounts SET salt = %s, password_hash = %s WHERE username = %s', (salt, password_hash(os.environ['DEMO_PASSWORD'], salt), 'demo'))
+            if result.rowcount != 1:
+                raise SystemExit('expected one synthetic account')
     elif sys.argv[1:] == ['serve']:
         make_server(('0.0.0.0', 8080), store, root).serve_forever()
     else:
-        raise SystemExit('usage: app.py seed|serve')
+        raise SystemExit('usage: app.py seed|reset-password|serve')
