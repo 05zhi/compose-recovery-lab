@@ -1,12 +1,23 @@
 # Compose Recovery Lab
 
-用實際還原與應用操作，驗證 Docker Compose 合成備份能否使用。
+**備份檔存在，不代表出事時真的救得回來。這個工具幫你做一次「資料救援演習」。**
 
-支援文件網站與庫存網站兩個受限模板：PostgreSQL 17 dump、附件、全新內網／volumes、SQL／檔案／關聯／HTTP／Chromium E2E 檢查、SQLite 歷史、崩潰回收、新 attempt 重試、JSON／HTML／錄影，以及依序排程與選用失敗通知。
+它會把備份還原到臨時測試環境，真的啟動網站，檢查資料能不能查到、附件能不能下載，最後產生報告並清除演練用的容器、網路與儲存空間。備份和報告會留下來，方便事後查看。
+
+例如：資料庫備份成功，但少備份了一份附件。網站可能照常啟動，資料筆數也正確；這個工具會在檢查附件與實際下載時抓出問題，讓報告清楚顯示「驗證失敗，但環境已清乾淨」。
+
+## 可以拿來做什麼？
+
+- **練習完整救援流程**：建立示範備份、還原網站、查看報告，熟悉每一步。
+- **確認檢查真的抓得到錯誤**：故意拿掉附件，觀察失敗原因與清理結果。
+- **留下可追溯的演練紀錄**：查看每次結果、階段耗時，以及有進入瀏覽器流程時的操作錄影。
+- **作為開發還原驗證流程的起點**：研究設定驗證、故障處理、隔離環境與中斷後回收。
+
+**目前是早期試用版本，只支援內建的文件網站與庫存網站兩個示範模板。** `backup` 建立的是合成測試資料的備份，不會替你現有的網站備份。要接入自己的應用，仍需要開發對應模板與檢查；不能直接丟入任意 Compose 專案就使用。
 
 ## 目前可用程度
 
-截至 2026-11-05，已是**可用的本機工程版本**，適合在專用測試環境進行合成資料演練與受控試用。已驗證環境為 WSL2 Ubuntu 24.04／Linux amd64；M1–M5 與 M6 的兩模板本機工程驗收已完成，真人獨立試用仍待回饋。
+截至 2026-11-05，已是**可用的本機工程版本**，適合在專用測試環境進行合成資料演練與受控試用。已驗證環境為 WSL2 Ubuntu 24.04／Linux amd64；兩個模板已完成本機工程驗收，獨立使用者試用仍待回饋。
 
 | 功能 | 已驗證範圍 |
 |---|---|
@@ -17,7 +28,7 @@
 
 最近一次修正後驗收通過 **40 次完整還原、840 次瀏覽器流程**，另通過 20 輪 libc 根因回歸、26 個整合情境、4 個原生訊號故障情境、12 次崩潰回收與 2 次 retry；最後演練資源零殘留。瀏覽器啟動時的環境變數競爭已透過 glibc 2.41 基底修正，沒有加入自動重試掩蓋失敗。詳見[根因與重複驗證紀錄](docs/BROWSER_INCIDENT.zh-TW.md)。
 
-目前不支援任意 Docker Compose 專案或正式環境原地還原。其他平台、完整冷 VM、整機斷電／檔案系統損毀及正式資料尚未驗收；兩名真人獨立試用與需求訪談也未完成。合成測試成功不能推論正式環境可用性、大資料量效能或完整災難復原能力。
+目前不支援任意 Docker Compose 專案或正式環境原地還原。其他平台、完整冷 VM、整機斷電／檔案系統損毀及正式資料尚未驗收；獨立使用者驗證也尚未完成。合成測試成功不能推論正式環境可用性、大資料量效能或完整災難復原能力。
 
 第一次使用建議先跑下方文件模板，再依[獨立試用流程](docs/TRIAL_GUIDE.zh-TW.md)驗證操作與報告是否清楚。接入自己的專案前，需確認符合支援的模板與備份契約；完整範圍以[驗收紀錄](docs/M3_M6_ACCEPTANCE.zh-TW.md)為準。
 
@@ -27,16 +38,18 @@
 
 ### 1. 準備環境與映像
 
-建置需要 Go、GCC 與 Python 3；執行需要 Docker Engine 與 Compose。Windows 使用者先在 PowerShell 進入 WSL，再切換到自己的 repo 目錄。若沿用本專案以 root 執行的本機測試環境，可使用：
+建置需要 Go、GCC 與 Python 3；執行需要 Docker Engine 與 Compose。Windows 使用者先在 PowerShell 進入 WSL，再切換到自己的 repo 目錄。例如：
 
 ```powershell
-wsl -u root
+wsl
 ```
 
 以下是 Linux shell 指令：
 
 ```sh
-# 先 cd 到自己的 compose-recovery-lab repo 根目錄
+# 第一次使用先取得專案（需要 Git）
+git clone https://github.com/05zhi/compose-recovery-lab.git
+cd compose-recovery-lab
 docker version
 docker compose version
 go build -buildvcs=false -o bin/crl ./cmd/crl
@@ -171,8 +184,6 @@ SIGKILL 後 `bin/crl recover` 對帳回收；下一次執行也先回收舊 atte
 - [第二模板](examples/inventory-app/README.md)
 - [架構與決策](docs/adr/0004-durable-adapters.md)
 - [獨立試用流程](docs/TRIAL_GUIDE.zh-TW.md)
-- [計畫書](docs/OPERATIONS.zh-TW.md)
-- [進度與 commit](docs/M3_M6_ACCEPTANCE.zh-TW.md)
 - [M1 驗收](docs/M1_ACCEPTANCE.zh-TW.md)／[M2 驗收](docs/M2_ACCEPTANCE.zh-TW.md)
 
-每個可驗收部分獨立 commit；本機 commit 與 push 分開處理。
+本專案採用 [MIT 授權](LICENSE)。回報問題時請附上版本、環境與去除敏感資訊的錯誤摘要；不要上傳真實備份、密碼或完整執行產物。

@@ -35,28 +35,17 @@
 - 最後檢查：演練、獨立瀏覽器、原生測試與調查容器／volume／network 全部零殘留；SQLite 待清理 attempt 為 0，診斷 trace instance 為 0。
 - Python 13 項單元測試通過；文件連結、編碼、code fence 與 Git whitespace 檢查通過。未將有限次數通過解讀為其他平台或未來版本永不失敗。
 
-修正與根因回歸 commit：`2d3d757`；原生訊號負向回歸：`7f4cbab`。兩模板最後一次成功報告及影片的可開啟複本位於 `reports/browser-incident/`（不提交 Git）。所有提交僅在本機，未 push。
 
 ## 重跑方式
 
 在 repo 根目錄的已授權 Linux／WSL 測試環境執行；輸出目錄必須是新的私有目錄。先執行 `python3 scripts/prepare-images.py`，再製作新 fixture，勿將舊 bundle 改用新映像鎖。
 
 ```sh
-python3 tests/integration/libc_environment.py --runs 20 --output /tmp/crl-libc-new
-python3 tests/integration/browser_failure.py --template document-app --output /tmp/crl-signals-new
-python3 tests/integration/stability.py --template document-app --runs 20 --browser-repeats 20 --output /tmp/crl-repeat-new
+python3 tests/integration/libc_environment.py --runs 20 --output ./artifacts/crl-libc-new
+python3 tests/integration/browser_failure.py --template document-app --output ./artifacts/crl-signals-new
+python3 tests/integration/stability.py --template document-app --runs 20 --browser-repeats 20 --output ./artifacts/crl-repeat-new
 ```
 
 庫存模板改用 `--template inventory-app` 及另一個輸出目錄。原生 libc 測試使用既有 GCC，編譯產物唯讀掛入無網路的專屬容器；不把 compiler 放進應用映像。
 
-## 原始證據（WSL，未提交 Git）
-
-| 位置 | 證據 |
-|---|---|
-| `/tmp/crl-flake-browser/` | 原設定的啟動 SIGSEGV 與當時資源觀測 |
-| `/tmp/crl-browser-fix/stability-document/` | 被否決的 full Chromium 候選同樣失敗 |
-| `/tmp/crl-rseq-disabled/` | 停用 glibc rseq 的候選仍失敗 |
-| `/tmp/crl-kernel-baseline-2/`、`/tmp/crl-kernel-signal/signal.trace` | 核心 general-protection fault 路徑 |
-| `/tmp/crl-native-registers/`、`/tmp/crl-native-analysis/` | 故障暫存器、固定映像二進位及 libc 對照 |
-| `/tmp/crl-libc-regression-baseline/` | 正式 libc 測試在舊映像的首輪失敗 |
-| `/tmp/crl-glibc-fix/` | 修正後版本、各套件結果、報告與影片 |
+原始報告、備份與主機診斷不隨原始碼發布；上方結果是維護者的本機驗收摘要，可使用測試腳本自行重現。

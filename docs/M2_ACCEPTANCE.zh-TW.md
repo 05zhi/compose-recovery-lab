@@ -43,8 +43,8 @@ doctor 環境分支的單元測試使用查詢替身；下面的備份、環境�
 
 持久驗收目錄：
 
-- WSL `/tmp/crl-m2-acceptance-final/`：28 項 M2 summary、plan、doctor、完整備份及 run 報告。
-- WSL `/tmp/crl-m2-m1-regression-final/`：M1 回歸的來源包、summary 及各次報告。
+- WSL `./artifacts/crl-m2-acceptance-final/`：28 項 M2 summary、plan、doctor、完整備份及 run 報告。
+- WSL `./artifacts/crl-m2-m1-regression-final/`：M1 回歸的來源包、summary 及各次報告。
 - 本機 repo `reports/m2/`：可開啟的 plan、doctor、summary、成功還原及 manifest 變動拒絕報告複本；依 gitignore 不提交產物。
 
 測試腳本可用 `--output NEW_DIRECTORY` 指定新目錄；M2 預設改存 Linux 使用者家目錄下的私有 acceptance 路徑，避免 WSL 重啟清理 `/tmp` 後證據遺失。

@@ -2,11 +2,11 @@
 
 ## 任務範圍
 
-先閱讀 `docs/OPERATIONS.zh-TW.md` 與 `docs/M3_M6_ACCEPTANCE.zh-TW.md`。M1–M5 已驗收；M6 已完成兩個合成模板的本機工程驗收，真人獨立試用仍待回饋。實際範圍與限制以 `docs/M3_M6_ACCEPTANCE.zh-TW.md` 為準。後續功能依使用者指示推進，不把未執行的試用、其他平台或冷 VM 驗證描述為已完成。
+先閱讀 `README.md` 與 `docs/OPERATIONS.zh-TW.md`。M1–M5 已驗收；M6 已完成兩個合成模板的本機工程驗收，真人獨立試用仍待回饋。實際範圍與限制以 `docs/M3_M6_ACCEPTANCE.zh-TW.md` 為準。後續功能依使用者指示推進，不把未執行的試用、其他平台或冷 VM 驗證描述為已完成。
 
 ## 必須遵守的版本控制規則
 
-使用者明確要求：**每完成一個部分就要 commit。**
+每完成一個經驗證的部分就 commit。
 
 1. 一個部分應有單一目的、明確完成條件與對應驗證。
 2. 修改前檢查工作目錄，保留使用者既有變更。
@@ -14,7 +14,7 @@
 4. 通過驗證後立即 commit，不累積多個已完成部分才一次提交。
 5. 使用 `docs:`、`feat:`、`fix:`、`test:`、`refactor:`、`chore:` 描述變更。
 6. 功能與必要測試一併提交。失敗或尚未驗證的工作不可宣稱完成。
-7. 里程碑完成後更新 `docs/M3_M6_ACCEPTANCE.zh-TW.md`，記錄檢查、限制與對應 commit。
+7. 里程碑完成後更新對應驗收文件，記錄檢查、限制與對應 commit。
 8. commit 與 push 分開回報。後續 push 依使用者授權進行；不得把本機提交說成已同步 GitHub。
 9. 不自行 force-push、改寫已分享歷史、amend 已發布 commit，或刪除使用者資料。
 
