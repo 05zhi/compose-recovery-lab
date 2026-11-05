@@ -22,13 +22,20 @@
 - `browser_failure.py` 驗證實際 Playwright 子程序 SIGSEGV／SIGABRT 的失敗判定、分類、stderr 遮蔽、無影片與清理；`libc_environment.py` 驗證真正的 libc 並行行為，已加入 acceptance 入口。
 - 詳細取捨見 [ADR 0005](adr/0005-browser-libc-environment-race.md)。
 
-## 初步修正驗收
+## 修正驗收
 
 - 新正式應用映像的 libc 競爭測試 20／20 通過，每次 20,000 次環境變數新增及多執行緒讀取。
 - M6 真實容器矩陣：文件 13 個、庫存 13 個情境全部符合預期，包含完整還原、資料缺失／錯誤、權限、啟動失敗、必要檢查略過及建立資源與 journal 的時差回收。
 - 新映像兩模板 SIGSEGV／SIGABRT 共四個情境全部通過。
 
-較長重複驗證與六階段 crash/retry 另於完成後補記；本節不先行宣稱它們通過。
+後續重複驗證已完成：
+
+- 文件／庫存各 20 次全新還原，每次初始檢查加 20 次全新瀏覽器操作，共 40 次還原、840 次瀏覽器流程，全部通過；每次保留非空影片並驗證資源清理。
+- 兩模板各六個階段 SIGKILL／recover，共 12 次崩潰回收；各一次全新 attempt retry 通過，原中斷紀錄未覆寫。
+- 最後檢查：演練、獨立瀏覽器、原生測試與調查容器／volume／network 全部零殘留；SQLite 待清理 attempt 為 0，診斷 trace instance 為 0。
+- Python 13 項單元測試通過；文件連結、編碼、code fence 與 Git whitespace 檢查通過。未將有限次數通過解讀為其他平台或未來版本永不失敗。
+
+修正與根因回歸 commit：`2d3d757`；原生訊號負向回歸：`7f4cbab`。兩模板最後一次成功報告及影片的可開啟複本位於 `reports/browser-incident/`（不提交 Git）。所有提交僅在本機，未 push。
 
 ## 重跑方式
 
