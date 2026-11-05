@@ -21,23 +21,134 @@
 
 第一次使用建議先跑下方文件模板，再依[獨立試用流程](docs/TRIAL_GUIDE.zh-TW.md)驗證操作與報告是否清楚。接入自己的專案前，需確認符合支援的模板與備份契約；完整範圍以[驗收紀錄](docs/M3_M6_ACCEPTANCE.zh-TW.md)為準。
 
-## 執行
+## 使用步驟導覽
 
-建置需要 Go、GCC 與 Python 3；執行需要 Docker Engine 與 Compose。Windows 請在 WSL2 內執行。版本與安裝方式見[環境紀錄](docs/ENVIRONMENT.zh-TW.md)及[操作手冊](docs/OPERATIONS.zh-TW.md)。
+先跑一次成功情境，再跑一次故意缺少附件的失敗情境。以下指令都在 **Linux／WSL 的 repo 根目錄**執行，並固定使用同一個獲准存取 Docker 的帳號；切換帳號會切換 SQLite 歷史與鎖。
 
-在專用 Linux 測試環境、repo 根目錄，以同一個獲准存取 Docker 的帳號執行：
+### 1. 準備環境與映像
 
-```sh
-go build -buildvcs=false -o bin/crl ./cmd/crl
-python3 scripts/prepare-images.py
-bin/crl backup --out backups/complete
-bin/crl doctor --config examples/document-app/drill.yaml
-bin/crl plan --config examples/document-app/drill.yaml
-bin/crl run --config examples/document-app/drill.yaml
-bin/crl history --limit 10
+建置需要 Go、GCC 與 Python 3；執行需要 Docker Engine 與 Compose。Windows 使用者先在 PowerShell 進入 WSL，再切換到自己的 repo 目錄。若沿用本專案以 root 執行的本機測試環境，可使用：
+
+```powershell
+wsl -u root
 ```
 
-備份目的地必須不存在。第二個模板、設定語法、歷史／恢復／retry、排程／通知及封裝方式見[操作與安裝手冊](docs/OPERATIONS.zh-TW.md)。映像準備需要網路，演練使用 immutable 本機映像，應用不發布 host ports。更新基底後需重新準備映像並建立新的合成備份；舊 bundle 保留原本的可信 image lock，不可直接改成新映像 ID。
+以下是 Linux shell 指令：
+
+```sh
+# 先 cd 到自己的 compose-recovery-lab repo 根目錄
+docker version
+docker compose version
+go build -buildvcs=false -o bin/crl ./cmd/crl
+python3 scripts/prepare-images.py
+```
+
+映像準備需要網路，完成後會產生兩模板各自的 `images.lock.json`。演練只使用已鎖定的本機映像。已經準備好相同版本時可跳過重新建置；版本與安裝方式見[環境紀錄](docs/ENVIRONMENT.zh-TW.md)及[操作手冊](docs/OPERATIONS.zh-TW.md)。
+
+### 2. 建立一份完整備份
+
+```sh
+bin/crl backup --template document-app-v1 --out backups/complete
+```
+
+這個命令會建立合成文件網站、匯出資料，然後清除臨時來源網站；不是讀取你現有的正式網站。預期退出碼為 `0`，並印出備份操作的 `report: .../report.json`。
+
+| 備份檔案 | 用途 |
+|---|---|
+| `database.dump` | PostgreSQL 資料，包含 10 筆合成文件 |
+| `uploads.tar` | 文件附件 |
+| `app-config.sanitized.json` | 去除秘密的應用設定 |
+| `manifest.json` | 檔案大小、SHA-256、映像與版本契約 |
+
+**備份目的地必須不存在。** 如果 `backups/complete` 已存在，可直接拿它繼續演練，前提是保留相符的可信 image lock；要建立另一份備份，請改用新目錄，並同步調整 `examples/document-app/drill.yaml` 的 `backup.path`（相對於設定檔所在目錄）。更新基底後應重新準備映像並建立新備份，不可直接修改舊 manifest 的映像 ID。
+
+### 3. 預檢環境與預覽計畫
+
+```sh
+bin/crl doctor --config examples/document-app/drill.yaml
+bin/crl plan --config examples/document-app/drill.yaml
+```
+
+`doctor` 預期顯示 `ready: true`，確認設定、manifest、來源映射、磁碟空間、Docker 與本機映像。`plan` 列出還原來源、必要檢查及預計建立的資源，不執行還原，也不檢查環境可用性。範例設定的工作目錄是 `/var/tmp/compose-recovery-lab-runs`；需調整時修改 `runtime.work_dir`，不要放進備份目錄內。
+
+### 4. 還原並驗證應用
+
+```sh
+bin/crl run --config examples/document-app/drill.yaml
+echo "exit code: $?"
+```
+
+工具會依序執行預檢、備份 staging、資料庫與附件還原、啟動網站、必要檢查，以及資源清理。它使用全新的內部網路與 volumes，不發布 host ports；網站由檢查程式操作，演練結束即移除。
+
+成功時退出碼為 `0`，終端機印出**這次還原**的 `report.json` 位置。每次 `run` 都建立新的 attempt，不覆寫之前的報告。範例會驗證 10 筆資料、10 份附件雜湊、HTTP 下載、Chromium 登入／搜尋／下載，以及指定外連端點是否被阻擋。
+
+### 5. 查看報告、錄影與歷史
+
+打開剛才 `run` 印出的 `report.json` 所在目錄，使用瀏覽器開啟同目錄的 `report.html`。先看以下項目：
+
+| 報告欄位／檔案 | 成功情境應看到什麼 |
+|---|---|
+| `verification_result` | `passed`，必要檢查全部通過 |
+| `cleanup_result` | `complete`，演練資源已清除 |
+| `checks` | 每項檢查的狀態與證據；有覆蓋欄位時另核對實際檢查數 |
+| `steps` | 各階段狀態與耗時 |
+| `remaining_resources` | 沒有待清理資源 |
+| `browser.webm` | 實際瀏覽器操作錄影；未進入瀏覽器流程時可能不產生 |
+
+也可由歷史讀取結果。將下方 `ATTEMPT_ID` 換成該報告的 `attempt_id`：
+
+```sh
+bin/crl history --limit 10
+bin/crl status --run ATTEMPT_ID --attempt
+```
+
+Windows／WSL 使用者可在 Linux shell 開啟報告所在資料夾，再查看 HTML 與影片。下方路徑請替換為這次輸出的位置：
+
+```sh
+REPORT_DIR='/實際的/attempt/目錄'
+explorer.exe "$(wslpath -w "$REPORT_DIR")"
+```
+
+### 6. 故意缺少附件，觀察驗證失敗
+
+另外建立一份故障備份，不修改前面成功的備份：
+
+```sh
+bin/crl backup --template document-app-v1 --omit-attachment \
+  --out backups/missing-attachment
+bin/crl run --bundle backups/missing-attachment
+echo "exit code: $?"
+```
+
+`backups/missing-attachment` 也必須是新目錄。這裡使用 `--bundle` 直接選取故障備份，避免仍讀取範例設定中的 `backups/complete`；兩個命令預設使用文件模板的本機 image lock。退出碼請緊接著 `run` 讀取，預期為 `1`。
+
+| 檢查 | 缺少 `document-01.txt` 時的預期結果 |
+|---|---|
+| `sql-documents` | `passed`，資料庫仍有 10 筆文件 |
+| `database-files` | `failed`，證據包含 `category=missing-file` |
+| `login-search-download` | `failed`，缺附件的下載回傳 HTTP `409` |
+| `external-connectivity` | `passed`，指定外連端點被阻擋 |
+| 整體驗證／清理 | `failed`／`complete` |
+
+故障備份本身的 manifest 與檔案雜湊仍有效，因此若將設定指向它，`doctor` 可以通過；還原後的關聯與下載檢查才會抓出缺檔。這個情境在 HTTP 檢查就失敗，尚未啟動 Chromium，因此沒有 `browser.webm`，報告會保留診斷檔。打開**這次失敗的** HTML 報告，對照上一份成功報告。
+
+### 7. 確認失敗後也清理完整
+
+除了確認報告為 `cleanup_result: complete`，也可把下方值換成失敗報告的 `attempt_id`，獨立查詢 Docker：
+
+```sh
+ATTEMPT_ID='填入失敗報告的 attempt_id'
+docker ps -aq --filter "label=io.compose-recovery-lab.run=$ATTEMPT_ID"
+docker volume ls -q --filter "label=io.compose-recovery-lab.run=$ATTEMPT_ID"
+docker network ls -q --filter "label=io.compose-recovery-lab.run=$ATTEMPT_ID"
+bin/crl status --run "$ATTEMPT_ID" --attempt
+```
+
+前三個查詢沒有輸出，代表本次容器、volumes 與網路零殘留；`status` 應保留 `failed` 與 `complete`，不會因清理成功把驗證改成通過。備份、報告及歷史會保留。如果是程序遭強制中止或清理未完成，先執行 `bin/crl recover`，再重新檢查清理狀態；不要使用全域 Docker prune。
+
+第二模板、設定語法、retry、排程／通知及封裝方式見[操作與安裝手冊](docs/OPERATIONS.zh-TW.md)。
+
+## 開發檢查
 
 ```sh
 go test -race ./...
