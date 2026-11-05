@@ -25,7 +25,7 @@ bin/crl history --limit 10
 ```sh
 go test -race ./...
 go vet ./...
-python3 -m unittest discover -s examples/document-app -p test_app.py
+python3 -m unittest discover -s examples/document-app -p "test_*.py"
 # 完整容器驗收命令見驗收紀錄；測試不使用正式資料。
 ```
 
@@ -38,6 +38,7 @@ SIGKILL 後 `bin/crl recover` 對帳回收；下一次執行也先回收舊 atte
 只接受可信的固定模板與操作員宣告，不接受任意 Compose 或正式環境原地還原。容器共享核心，內網不是惡意程式沙箱；單一外連端點測試也不是全面網路安全保證。實測時間不是 RTO 保證。
 
 - [完整驗收與限制](docs/M3_M6_ACCEPTANCE.zh-TW.md)
+- [瀏覽器間歇性失敗根因與修正](docs/BROWSER_INCIDENT.zh-TW.md)
 - [操作與安裝](docs/OPERATIONS.zh-TW.md)
 - [第二模板](examples/inventory-app/README.md)
 - [架構與決策](docs/adr/0004-durable-adapters.md)

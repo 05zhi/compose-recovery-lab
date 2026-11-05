@@ -1,4 +1,7 @@
-FROM python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
+FROM python:3.12.12-slim-trixie@sha256:f3fa41d74a768c2fce8016b98c191ae8c1bacd8f1152870a3f9f87d350920b7c
+# glibc >= 2.41 retains environment arrays during concurrent getenv/setenv.
+# Chromium startup can query gettext LANGUAGE on a worker while mutating env.
+RUN python -c "import os; assert tuple(map(int, os.confstr('CS_GNU_LIBC_VERSION').split()[1].split('.'))) >= (2, 41)"
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

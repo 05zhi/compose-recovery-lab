@@ -116,3 +116,7 @@ python3 scripts/benchmark-replay.py --cache cold \
 每個輸出目錄必須不存在。負載為 100 MiB／1 GiB 邏輯 PostgreSQL payload，停用該欄位 TOAST 壓縮、保留 dump 壓縮；不是 1 GiB 附件或不可壓縮備份。每組三次，保留原始階段時間及資料大小。檢查總列數、總位元組數、第一筆 payload 與所有既有應用流程，不宣稱逐位元組檢查全部 benchmark payload。
 
 warm 會先讀取指定備份檔；cold 只對這些合成輸入檔使用 posix_fadvise，再用 mincore 確認執行前頁面不在記憶體。不清空全機 cache，兩組都沿用本機映像快取；因此不是冷 VM／冷映像測試。replay 另以 0.1 秒間隔取樣工作目錄及 Docker 所在檔案系統用量差，這是觀察值，可能受其他主機工作影響，不是硬性磁碟 quota 或峰值保證。實測結果見驗收紀錄。
+
+## 瀏覽器原生啟動失敗回歸
+
+目前模板基底要求 glibc 至少 2.41，避免已重現的 getenv/setenv 競爭。升級來源後重新執行 `scripts/prepare-images.py`，並以新 image lock 製作新的合成備份；不可把舊 manifest 的映像 ID 改成新值。`scripts/acceptance.py` 已包含兩模板原生訊號負向測試與 libc 競爭回歸。較長的重複還原可獨立使用 `tests/integration/stability.py`；第一個失敗即停止並保留結果。[診斷、重跑指令與證據](BROWSER_INCIDENT.zh-TW.md)。

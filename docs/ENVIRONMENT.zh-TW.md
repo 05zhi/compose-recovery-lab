@@ -42,3 +42,7 @@ Python digest：`sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcad
 - Playwright Python：1.58.0；Chromium headless shell 與 ffmpeg 在映像準備階段安裝。兩個 adapter 都固定建置後 image ID。
 - `scripts/prepare-images.py` 產生 document-app 與 inventory-app 各自的 images.lock.json。建置 context 只複製明確允許的檔案，不包含來源備份或 reports。
 - 本機套件解壓與新 HOME 驗收使用既有可信映像快取；沒有把它描述成另一台全新 VM 的安裝結果。
+
+## 2026-11-05：瀏覽器啟動競爭修正
+
+以上 M1 表格保留當時歷史版本。目前兩模板共用 Python `3.12.12-slim-trixie`，digest `sha256:f3fa41d74a768c2fce8016b98c191ae8c1bacd8f1152870a3f9f87d350920b7c`，實測 glibc `2.41-12+deb13u1`。Python／Playwright／Chromium 版本與 Chromium 執行檔雜湊均保持不變；Debian 系統函式庫隨基底更新。[原因與驗證](BROWSER_INCIDENT.zh-TW.md)。主機 kernel／Docker／Go 與 PostgreSQL digest 未變更。
