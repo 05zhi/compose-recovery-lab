@@ -38,3 +38,10 @@ Thumbs.db
 
 # Machine-local immutable app image lock
 examples/*/images.lock.json
+
+# Private planning and local audit files (keep outside the public repository)
+/docs/PROJECT_PLAN.zh-TW.md
+/docs/PROGRESS.md
+*.bundle
+.gitleaks*.json
+gitleaks*.json

@@ -3,7 +3,7 @@
 - 日期：2026-11-04（Asia/Taipei）。
 - 結論：固定 `document-app-v1` 的 M1 垂直切片通過；不代表 M2–M6 或完整 P0 驗收完成。
 - 環境：WSL2 Ubuntu 24.04.2 x86-64、Go 1.22.2、Docker 29.1.3、Compose 2.40.3、PostgreSQL 17.6、Python 3.12.12。完整版本與 digest 見 [環境紀錄](ENVIRONMENT.zh-TW.md)。
-- 核心 commit：`2c4ea14`、`00a0280`；整合矩陣：`42054a3`；報告與備份失敗處理：`6563b15`。
+- 核心 commit：`fc03353`、`6e169f8`；整合矩陣：`09b2772`；報告與備份失敗處理：`8963a11`。
 
 ## 實際執行
 

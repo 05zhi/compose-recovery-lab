@@ -53,12 +53,12 @@ doctor 環境分支的單元測試使用查詢替身；下面的備份、環境�
 
 | Commit | 內容 |
 |---|---|
-| `685c4f3` | 嵌入式 JSON Schema 與嚴格 YAML 設定驗證 |
-| `853f473` | 嚴格 manifest JSON、bounded no-follow 來源讀取 |
-| `708fe43` | 唯讀 doctor／plan、來源映射、run --config |
-| `4595bba` | M2 離線純度與真實 Docker 整合測試 |
-| `ff2cbc2` | 不相容引擎與不安全 workspace 拒絕 |
-| `65926dd` | 規劃後 manifest 變動與發布範例驗證 |
-| `388c958` | 在 WSL 持久保存驗收證據 |
+| `66bdcf2` | 嵌入式 JSON Schema 與嚴格 YAML 設定驗證 |
+| `1c6400e` | 嚴格 manifest JSON、bounded no-follow 來源讀取 |
+| `68c6023` | 唯讀 doctor／plan、來源映射、run --config |
+| `31d5b2d` | M2 離線純度與真實 Docker 整合測試 |
+| `e578838` | 不相容引擎與不安全 workspace 拒絕 |
+| `74f47c2` | 規劃後 manifest 變動與發布範例驗證 |
+| `943119c` | 在 WSL 持久保存驗收證據 |
 
 M2 仍只接受固定模板及其三個來源角色，不支援任意來源改名、host mount、自訂 SQL／command 或秘密注入。SQLite、自動重試、通用 checker、第二模板與完整多階段崩潰矩陣留待後續里程碑。詳見 [操作手冊](M2_RUNBOOK.zh-TW.md) 與 [ADR 0003](adr/0003-versioned-config-and-offline-plans.md)。
