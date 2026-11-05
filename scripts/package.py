@@ -16,7 +16,7 @@ def main():
         archive=out/f'compose-recovery-lab-{commit}-linux-amd64.tar.gz'
         with tarfile.open(archive,'w:gz') as tf:
             for name in files:
-                if name and (name.startswith(('cmd/','internal/','scripts/','examples/','docs/','tests/')) or name in ('go.mod','go.sum','README.md','AGENTS.md','.gitignore')):tf.add(ROOT/name,arcname='compose-recovery-lab/'+name,filter=normalized)
+                if name and (name.startswith(('cmd/','internal/','scripts/','examples/','docs/','tests/')) or name in ('go.mod','go.sum','README.md','LICENSE','AGENTS.md','.gitignore')):tf.add(ROOT/name,arcname='compose-recovery-lab/'+name,filter=normalized)
             tf.add(binary,arcname='compose-recovery-lab/bin/crl',filter=normalized)
     (out/'SHA256SUMS').write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+'  '+archive.name+'\n')
     print(archive)

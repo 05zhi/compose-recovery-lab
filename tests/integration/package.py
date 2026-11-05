@@ -10,6 +10,8 @@ def execute(a):
  out=a.output.resolve();out.mkdir(mode=0o700,parents=True,exist_ok=False)
  with tarfile.open(archive) as tf:
   members=tf.getmembers()
+  license_data=tf.extractfile("compose-recovery-lab/LICENSE").read()
+  assert b"MIT License" in license_data and b"Copyright (c) 2026 05zhi" in license_data
   for m in members:
    assert not m.name.startswith('/') and '..' not in Path(m.name).parts
    assert not m.name.endswith(('.dump','images.lock.json','.sqlite3')) and '/reports/' not in m.name
