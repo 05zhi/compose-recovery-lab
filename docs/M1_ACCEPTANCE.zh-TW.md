@@ -48,7 +48,7 @@ python3 tests/integration/m1.py       PASS（兩輪；第二輪含備份失敗�
 
 ## 證據及重現
 
-- 完整第二輪證據保留在 WSL 的 `./artifacts/crl-m1-acceptance-02/`，含每次報告與合成備份。
+- 完整第二輪證據保留在 WSL 的 維護者保留的本機驗收產物（未發布），含每次報告與合成備份。
 - 可直接開啟的 JSON／HTML 複本位於本機 repo 的 `reports/m1/`（Git 忽略），包含 `complete-restore` 與 `missing-attachment`。
 - 操作指令與清理限制見 [M1 操作手冊](M1_RUNBOOK.zh-TW.md)。
 
