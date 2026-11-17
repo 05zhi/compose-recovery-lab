@@ -81,3 +81,7 @@ python3 scripts/acceptance.py --output "$HOME/crl-acceptance-new"
 ## 2026-11-05：間歇性應用檢查後續
 
 後續已重現並修復 Chromium 啟動時 glibc 環境陣列讀寫競爭，新增原生訊號診斷、libc 根因回歸與長批次驗證。新映像通過 40 次完整還原／840 次瀏覽器流程及兩模板崩潰回收矩陣。當時兩筆歷史失敗因未保存例外，仍不能逐筆證明同因；原始失敗紀錄不變。[完整根因、修正與限制](BROWSER_INCIDENT.zh-TW.md)。
+
+## 2026-11-15：搬遷後基準
+
+在既有 Ubuntu 24.04 WSL2 的新工作目錄執行 Go build、race 測試、vet 與 9 項 Python fixture 測試，全部通過。兩次合成備份通過，完整還原為 passed，缺附件還原為 failed 且附件檢查失敗。四個操作均為 cleanup complete，按各自 attempt 標籤查詢容器、網路及 volume 均無殘留。History 可讀取；本輪沿用既有映像。原始證據由維護者保留，未發布。

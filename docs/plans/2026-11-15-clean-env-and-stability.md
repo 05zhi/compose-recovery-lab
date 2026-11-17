@@ -1,5 +1,5 @@
 ---
-status: ready        # draft | ready | in-progress | done | blocked
+status: in-progress  # draft | ready | in-progress | done | blocked
 planner: claude
 executor: codex
 branch: main
@@ -189,10 +189,7 @@ M1–M5 已驗收，M6 的工程部分也已通過。`docs/M3_M6_ACCEPTANCE.zh-T
 
 ## 執行紀錄
 
-由執行者填寫。
-
-- 執行者／日期：
-- commit：
-- 測試結果：
-- 偏離計畫之處：
-- 未完成或未驗證：
+- 執行者／日期：Codex，2026-11-15 執行基準，2026-11-17 核對證據。
+- 步驟 0：確認兩份搬遷差異都只更新共用規則路徑。Go build、race、vet、Python 9 項通過；完整文件還原 passed，缺附件還原 failed。四次備份／還原均清理完整，依 attempt 標籤核對零殘留。證據為既有 Ubuntu 的 `~/crl-relocation-baseline-20261115`，原始產物未發布。
+- 偏離計畫之處：使用者提供的 `questions` 路徑沒有該檔，依同名且內容一致的本專案計畫接續。基準使用合成備份、獨立工作目錄及既有映像。
+- 未完成或未驗證：步驟 1–7。

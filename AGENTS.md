@@ -1,6 +1,6 @@
 # 開發規則
 
-共用規則見 `D:\Codex\Projects\AGENTS.md`（Claude 與 Codex 共用，含自動 commit 與 push），先讀它。本檔只寫此專案特有的規則；衝突時以本檔為準。計畫與交接放在 `docs/plans/`。
+共用規則見 `C:\Andy\dev\Projects\AGENTS.md`（Claude 與 Codex 共用，含自動 commit 與 push），先讀它。本檔只寫此專案特有的規則；衝突時以本檔為準。計畫與交接放在 `docs/plans/`。
 
 ## 任務範圍
 
