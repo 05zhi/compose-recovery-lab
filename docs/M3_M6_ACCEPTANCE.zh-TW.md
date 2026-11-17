@@ -85,3 +85,5 @@ python3 scripts/acceptance.py --output "$HOME/crl-acceptance-new"
 ## 2026-11-15：搬遷後基準
 
 在既有 Ubuntu 24.04 WSL2 的新工作目錄執行 Go build、race 測試、vet 與 9 項 Python fixture 測試，全部通過。兩次合成備份通過，完整還原為 passed，缺附件還原為 failed 且附件檢查失敗。四個操作均為 cleanup complete，按各自 attempt 標籤查詢容器、網路及 volume 均無殘留。History 可讀取；本輪沿用既有映像。原始證據由維護者保留，未發布。
+
+15 項故障案例與 10 項 P0 條件的既有驗收來源見[故障矩陣](FAULT_MATRIX.zh-TW.md)。追蹤表區分已驗證的執行器中斷與待驗證的整個 WSL 環境中斷。
