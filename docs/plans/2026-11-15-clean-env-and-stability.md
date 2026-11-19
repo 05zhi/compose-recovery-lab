@@ -1,5 +1,5 @@
 ---
-status: in-progress  # draft | ready | in-progress | done | blocked
+status: blocked      # draft | ready | in-progress | done | blocked
 planner: claude
 executor: codex
 branch: main
@@ -194,4 +194,9 @@ M1–M5 已驗收，M6 的工程部分也已通過。`docs/M3_M6_ACCEPTANCE.zh-T
 - 偏離計畫之處：使用者提供的 `questions` 路徑沒有該檔，依同名且內容一致的本專案計畫接續。基準使用合成備份、獨立工作目錄及既有映像。
 - 步驟 0 commit：`205c681`，遠端 SHA 已核對。
 - 步驟 1：比對 15 項故障案例與 10 項 P0 條件，見[故障矩陣](../FAULT_MATRIX.zh-TW.md)。既有整合測試已覆蓋矩陣所列情境，因此未新增或重新執行測試。
-- 未完成或未驗證：步驟 2–7。
+- 步驟 1 commit：`d5283d3`，已推送並核對遠端。
+- 2026-11-19 接續步驟 2–3：兩個新 WSL 已安裝，空映像快取與新 clone 建置均確認。Ubuntu README 成功／缺附件流程完成；完整入口僅 M2 通過，M1 經工作階段中斷後續跑又遇服務就緒逾時。Debian 兩次映像準備遇 PyPI ReadTimeout。詳見[乾淨環境紀錄](../CLEAN_ENVIRONMENT.zh-TW.md)。
+- 阻礙：三個發行版共用相同 network namespace，且三個 Docker daemon 的 bridge subnet 重疊。觸發「可能影響主 Ubuntu 其他專案」停止條件。需決定改用獨立 VM，或先建立隔離網路。
+- 偏離補充：執行者為縮短等待，先並行 Debian 準備及主 Ubuntu soak；發現共用網路後停止。本輪 soak 兩次完整流程通過，第三次只完成備份，尚未完成 100 次。停止後三個 daemon 的本工具標籤資源均為零。
+- 證據位置（私有）：兩個新發行版各自的 `~/crl-clean-walkthrough-ubuntu`、`~/crl-clean-walkthrough-debian`，乾淨 Ubuntu 的 `~/crl-acceptance-clean-ubuntu`，主 Ubuntu 的 `~/crl-soak-20261119`。三份腳本草稿保留於 repo 忽略的 `tmp/`，只有 Python 語法檢查，尚未發布為可用驗收腳本。
+- 未完成或未驗證：步驟 2–3 的完整驗收，步驟 4–7；未執行 WSL terminate 故障矩陣或工具對照。

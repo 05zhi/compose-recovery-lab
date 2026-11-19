@@ -87,3 +87,7 @@ python3 scripts/acceptance.py --output "$HOME/crl-acceptance-new"
 在既有 Ubuntu 24.04 WSL2 的新工作目錄執行 Go build、race 測試、vet 與 9 項 Python fixture 測試，全部通過。兩次合成備份通過，完整還原為 passed，缺附件還原為 failed 且附件檢查失敗。四個操作均為 cleanup complete，按各自 attempt 標籤查詢容器、網路及 volume 均無殘留。History 可讀取；本輪沿用既有映像。原始證據由維護者保留，未發布。
 
 15 項故障案例與 10 項 P0 條件的既有驗收來源見[故障矩陣](FAULT_MATRIX.zh-TW.md)。追蹤表區分已驗證的執行器中斷與待驗證的整個 WSL 環境中斷。
+
+## 2026-11-19：新 WSL 驗收受阻
+
+新 Ubuntu 完成冷快取映像準備及 README 成功／缺附件流程。完整矩陣續跑遇服務就緒逾時，新 Debian 則在映像準備遇 PyPI 下載逾時。實測兩個新發行版與主 Ubuntu 共用網路 namespace，三個 Docker bridge subnet 重疊，依計畫停止後續故障注入。最後本工具 Docker 資源零殘留。完整結果與隔離決定見[乾淨環境紀錄](CLEAN_ENVIRONMENT.zh-TW.md)。這輪尚未完成跨發行版、整個環境中斷及 100 次穩定性驗收。
