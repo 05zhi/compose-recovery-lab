@@ -34,3 +34,16 @@ Ubuntu 完整入口共有 13 個套件。首次 M2 通過，M1 執行期間整�
 ## 本機證據
 
 原始產物為維護者保留的本機驗收產物（未發布）。Ubuntu 的步驟紀錄、原始與續跑日誌、suite-results、interrupted 目錄、shared-network-blocker，以及主 Ubuntu 的 soak session-interrupted 記錄可供後續追查。新腳本草稿留在忽略的 `tmp/`，尚未完成實際驗收。
+
+## 2026-11-25：獨立 VM 接續
+
+使用者選定獨立 VM 後，已使用既有 VirtualBox 7.0.10 建立兩個專用客體。兩者各有 6 GiB 記憶體、32 GiB 動態磁碟、獨立 Linux 核心與 NAT，SSH 僅經主機 loopback 轉接。SSH 與 cloud-init 已確認就緒，目前正在安裝驗收工具，尚未完成 VM 內的 Docker 驗收。
+
+| 客體 | 映像來源與校驗 |
+|---|---|
+| Ubuntu 24.04 | 官方 noble cloud VMDK，SHA-256 `9a1e3959c9f4ad9d4752101fd4ff9a43191fb7d72e61fa20e033f9fd235ce794`，與官方 SHA256SUMS 相符。[來源](https://cloud-images.ubuntu.com/noble/current/) |
+| Debian 13 | 官方 genericcloud amd64 tar.xz，SHA-512 `156ec11d792d5d051923f6a16eb9a25025a58f3f8e71ed1204f2862f40480cf8ee8e89cf5ea3633cc7e1fb04879473f876cafe8404a387e08546af659ac862c1`，與官方 SHA512SUMS 相符。[來源](https://cloud.debian.org/images/cloud/trixie/latest/) |
+
+目前客體核心分別為 Ubuntu `6.8.0-147-generic` 與 Debian `6.12.117+deb13-cloud-amd64`。原先的 4 vCPU／預設計時設定在此 Windows Hyper-V 相容模式下無法穩定完成開機，改為單 vCPU。Debian 採 Hyper-V paravirtualization；Ubuntu 明確重現 IO-APIC timer kernel panic，改為 KVM paravirtualization、關閉客體 IO-APIC 並啟用 HPET 後完成開機。兩者使用 virtio 網卡，Debian genericcloud 在 Intel 模擬網卡時只有 loopback，改用 virtio 後取得 DHCP 位址。這些是客體硬體配置，演練容器的資源與逾時設定尚未更動。
+
+VM 建立、首次開機與修正過程均保留本機紀錄。主機 Windows 的 Hyper-V 與 WSL 設定沿用既有狀態。
