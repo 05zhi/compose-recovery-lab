@@ -18,6 +18,8 @@ bin/crl run --config examples/document-app/drill.yaml
 
 映像準備階段需要網路；演練只使用已鎖定的本機映像。Python base 與 PostgreSQL 固定 digest，Playwright 固定 1.58.0；本機 image lock 保存建置後 immutable ID，不提交 Git。重新建置後請重新製作 fixture；舊備份只能搭配它自己的可信 image lock。
 
+映像準備會為文件模板建立 `crl-document-base:<完整 image hash>` 本機標籤，供庫存模板繼承。BuildKit 與傳統 builder 都透過這個標籤讀取相同的本機映像，產出的 image lock 仍保存 immutable ID。可在已準備建置工具的測試環境執行 `python3 tests/integration/image_preparation.py --output "$HOME/crl-image-preparation-new"`，重新建置兩個模板並以無網路容器核對共用程式內容。此建置檢查需要網路，輸出目錄必須是新目錄。
+
 第二模板有產品、兩個倉庫、12 筆庫存關聯與六份巢狀規格附件，額外驗證 CSV 彙總匯出：
 
 ```sh

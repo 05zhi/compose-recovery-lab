@@ -20,6 +20,10 @@ def main():
                 command+=['--build-arg','BASE='+base,'-f',str(dest/'Dockerfile')]
             subprocess.run([*command,str(context)],env=env,check=True);image=iid.read_text().strip()
         lock=ROOT/'examples'/name/'images.lock.json';lock.write_text(json.dumps({'postgres':POSTGRES,'app':image},indent=2)+'\n');lock.chmod(0o600)
-        if name=='document-app':base=image
+        if name=='document-app':
+            # BuildKit parses a bare sha256 image ID as a registry reference.
+            # A content-addressed local tag also works with the legacy builder.
+            base='crl-document-base:'+image.removeprefix('sha256:')
+            subprocess.run(['docker','tag',image,base],env=env,check=True)
         print('Trusted local image lock:',lock,flush=True)
 if __name__=='__main__':main()

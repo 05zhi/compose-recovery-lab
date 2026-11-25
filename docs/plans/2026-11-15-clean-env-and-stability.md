@@ -191,6 +191,7 @@ M1–M5 已驗收，M6 的工程部分也已通過。`docs/M3_M6_ACCEPTANCE.zh-T
 
 - 2026-11-19 使用者決定改用獨立 VM。改以既有 VirtualBox 的 Ubuntu 24.04 與 Debian 13 客體接續步驟 2–7；步驟 4 改用本次專用 VM 的強制 poweroff。原 WSL 失敗證據保留。VM 電源中斷仍不涵蓋實體磁碟控制器與檔案系統損毀。已驗證 VirtualBox 7.0.10 能啟動本次新建 VM，採 4 vCPU、6 GiB、NAT 與 loopback SSH，磁碟採動態配置。後續實測結果另記。
 - 2026-11-25 VM 接續：修正客體開機相容性後，Ubuntu 與 Debian 的 SSH／cloud-init 均已就緒。實際採 1 vCPU／6 GiB／32 GiB 動態磁碟及 virtio 網卡，兩者核心已核對。Ubuntu 的 IO-APIC timer panic 與 Debian 原模擬網卡無介面均保留原始紀錄。正在安裝驗收工具，詳見[獨立 VM 紀錄](../CLEAN_ENVIRONMENT.zh-TW.md#2026-11-25獨立-vm-接續)。
+- VM 程式相容性修正：已確認 Debian BuildKit 無法把裸 image ID 當作 FROM 的本機來源；映像準備改用完整 hash 的本機標籤。新增真實雙模板建置與無網路容器來源驗證，Debian BuildKit 與 Ubuntu 傳統 builder 均通過。原始失敗與回歸證據保留。Ubuntu 首次單核心 doctor 失敗、雙核心後 README 兩個流程符合預期，但 M2 期間遇 VM timer／RCU stall，已回收中斷資源；完整驗收仍待續跑。
 
 - 執行者／日期：Codex，2026-11-15 執行基準，2026-11-17 核對證據。
 - 步驟 0：確認兩份搬遷差異都只更新共用規則路徑。Go build、race、vet、Python 9 項通過；完整文件還原 passed，缺附件還原 failed。四次備份／還原均清理完整，依 attempt 標籤核對零殘留。證據為既有 Ubuntu 的 `~/crl-relocation-baseline-20261115`，原始產物未發布。

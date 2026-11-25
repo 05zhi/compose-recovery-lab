@@ -47,3 +47,13 @@ Ubuntu 完整入口共有 13 個套件。首次 M2 通過，M1 執行期間整�
 目前客體核心分別為 Ubuntu `6.8.0-147-generic` 與 Debian `6.12.117+deb13-cloud-amd64`。原先的 4 vCPU／預設計時設定在此 Windows Hyper-V 相容模式下無法穩定完成開機，改為單 vCPU。Debian 採 Hyper-V paravirtualization；Ubuntu 明確重現 IO-APIC timer kernel panic，改為 KVM paravirtualization、關閉客體 IO-APIC 並啟用 HPET 後完成開機。兩者使用 virtio 網卡，Debian genericcloud 在 Intel 模擬網卡時只有 loopback，改用 virtio 後取得 DHCP 位址。這些是客體硬體配置，演練容器的資源與逾時設定尚未更動。
 
 VM 建立、首次開機與修正過程均保留本機紀錄。主機 Windows 的 Hyper-V 與 WSL 設定沿用既有狀態。
+
+### BuildKit 建置修正與回歸
+
+Debian 的 Docker 26.1.5／BuildKit 成功建立文件映像後，庫存模板的 `FROM sha256:<image ID>` 被解析成 `docker.io/library/sha256:<hash>`，並因遠端查詢失敗而中止。這是已確認的映像準備相容性問題。
+
+`scripts/prepare-images.py` 現在先將文件映像加上以完整 image hash 命名的本機標籤，再傳給庫存 Dockerfile 的 BASE；兩模板的 lock 仍保存 immutable image ID。新增真實整合回歸，建置後確認標籤指向正確 image ID，並以兩個無網路、唯讀容器核對共用來源 SHA-256 與應用模組匯入。Debian BuildKit 與 Ubuntu 傳統 builder 均通過，探針只清理自己建立且標籤一致的容器。原始失敗及回歸結果為維護者保留的本機驗收產物（未發布）。
+
+### 後續 VM 設定與中斷
+
+Ubuntu 首次單核心備份成功，但 doctor 依既有條件要求至少 2 CPUs／2 GiB，預檢未通過。改為雙核心、IO-APIC 與 HPET 啟用後，預檢及 README 完整還原、缺附件流程符合預期。隨後 M2 執行期間出現 timer／RCU stall，客體紀錄包含數萬秒 soft lockup，套件因程序逾時失敗；已保留原始紀錄，未視為完整驗收通過。恢復時改用 Hyper-V paravirtualization 並回收中斷資源，後續結果待驗證。
